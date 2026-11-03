@@ -250,10 +250,14 @@
     .event-card { min-width: 0; border: 1px solid var(--line); background: #f8f6f0; transition: transform .2s, border-color .2s; }
     .event-card:hover { transform: translateY(-4px); border-color: var(--ink); }
     .event-poster { position: relative; display: flex; height: 202px; overflow: hidden; align-items: center; justify-content: center; }
-    .event-poster::before, .event-poster::after { content: ""; position: absolute; border: 1px solid rgba(23,24,21,.45); border-radius: 50%; }
-    .event-poster::before { width: 155px; height: 155px; }
-    .event-poster::after { width: 125px; height: 125px; }
-    .poster-type { position: relative; z-index: 1; font-family: var(--serif); font-size: 37px; font-style: italic; line-height: .9; text-align: center; letter-spacing: -.06em; transform: rotate(-8deg); }
+    .event-poster::before, .event-poster::after { content: ""; position: absolute; width: 48%; aspect-ratio: 1; border-radius: 50%; background: rgba(255,255,255,.32); filter: blur(28px); }
+    .event-poster::before { top: -18%; left: -8%; }
+    .event-poster::after { right: -9%; bottom: -23%; background: rgba(116,83,159,.18); }
+    .event-poster.has-image::before, .event-poster.has-image::after { display: none; }
+    .event-poster-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .poster-fallback { position: relative; z-index: 1; display: grid; width: 100%; height: 100%; padding: 34px 22px; place-items: center; }
+    .event-poster.has-image .poster-fallback { display: none; }
+    .poster-type { position: relative; z-index: 1; width: 100%; min-width: 0; max-width: 100%; font-family: var(--sans); font-size: clamp(18px, 2.4vw, 30px); font-style: normal; font-weight: 850; line-height: .96; text-align: center; letter-spacing: -.045em; text-wrap: balance; word-break: normal; overflow-wrap: normal; hyphens: auto; }
     .poster-label { position: absolute; z-index: 2; top: 12px; left: 12px; padding: 6px 8px; background: var(--paper); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
     .poster-date { position: absolute; z-index: 2; right: 12px; bottom: 12px; padding: 6px 8px; background: var(--ink); color: white; font-size: 10px; font-weight: 800; }
     .poster-1 { background: #f47e55; }
@@ -264,14 +268,10 @@
     .poster-6 { background: #afd6ca; }
     .poster-7 { background: #f2cb51; }
     .poster-8 { background: #8c94fd; }
-    .poster-1 .poster-type { font-family: var(--sans); font-weight: 900; font-style: normal; font-size: 43px; text-transform: uppercase; }
-    .poster-2 .poster-type { transform: rotate(8deg); }
+    .poster-1 .poster-type { font-family: var(--sans); font-weight: 900; font-style: normal; text-transform: uppercase; }
     .poster-3 .poster-type { font-family: var(--sans); font-weight: 900; font-style: normal; text-transform: uppercase; }
-    .poster-4 .poster-type { font-size: 33px; }
-    .poster-5 .poster-type { font-family: var(--sans); font-size: 32px; font-weight: 900; font-style: normal; }
-    .poster-6 .poster-type { transform: rotate(0); }
+    .poster-5 .poster-type { font-family: var(--sans); font-weight: 900; font-style: normal; }
     .poster-7 .poster-type { font-family: var(--sans); font-weight: 900; font-style: normal; }
-    .poster-8 .poster-type { font-size: 35px; }
     .event-info { padding: 15px 14px 14px; }
     .event-meta { gap: 8px; margin-bottom: 9px; color: var(--muted); font-size: 10px; }
     .event-meta .tag { color: var(--blue); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
@@ -570,13 +570,13 @@
     html[data-theme="dark"] .dialog-field textarea { border-color: rgba(255,239,231,.16); color: var(--ink); }
     html[data-theme="dark"] .dialog-field option { background: #403b40; color: #f1e9e5; }
     html[data-theme="dark"] .admin-event-actions .delete-event { color: #ffabc7; }
-    html[data-theme="dark"] .poster-1 { background: radial-gradient(circle at 25% 15%, #ae7f7e, transparent 42%), linear-gradient(145deg, #754f58, #614b61); }
-    html[data-theme="dark"] .poster-2 { background: radial-gradient(circle at 25% 20%, #c3c5a5, transparent 36%), linear-gradient(145deg, #687452, #50675c); }
+    html[data-theme="dark"] .poster-1 { background: radial-gradient(circle at 25% 15%, #bd8cac, transparent 42%), linear-gradient(145deg, #764e70, #594b70); }
+    html[data-theme="dark"] .poster-2 { background: radial-gradient(circle at 25% 20%, #b8c6a5, transparent 36%), linear-gradient(145deg, #526d65, #405d63); }
     html[data-theme="dark"] .poster-3 { background: radial-gradient(circle at 70% 20%, #b8aacb, transparent 38%), linear-gradient(145deg, #716782, #55566d); }
-    html[data-theme="dark"] .poster-4 { background: radial-gradient(circle at 28% 18%, #c4a98b, transparent 38%), linear-gradient(145deg, #745d50, #594a4c); }
+    html[data-theme="dark"] .poster-4 { background: radial-gradient(circle at 28% 18%, #d5bdc0, transparent 38%), linear-gradient(145deg, #756078, #594f6b); }
     html[data-theme="dark"] .poster-5 { background: radial-gradient(circle at 25% 20%, #d2a3ae, transparent 40%), linear-gradient(145deg, #795764, #62515e); }
     html[data-theme="dark"] .poster-6 { background: radial-gradient(circle at 75% 20%, #9db8a2, transparent 38%), linear-gradient(145deg, #506e61, #435d5d); }
-    html[data-theme="dark"] .poster-7 { background: radial-gradient(circle at 25% 20%, #cdbb8a, transparent 40%), linear-gradient(145deg, #78684c, #5d554c); }
+    html[data-theme="dark"] .poster-7 { background: radial-gradient(circle at 25% 20%, #d9c99c, transparent 40%), linear-gradient(145deg, #75634f, #5a5060); }
     html[data-theme="dark"] .poster-8 { background: radial-gradient(circle at 26% 18%, #afa9d0, transparent 42%), linear-gradient(145deg, #5d5c7c, #474a65); }
     html[data-theme="dark"] .poster-date { background: rgba(54,48,54,.88); color: #f4ece7; }
     html[data-theme="dark"] .footer { color: var(--ink); border-top-color: rgba(255,239,231,.12); }
@@ -641,10 +641,7 @@
       .event-poster { height: 155px; }
       .event-poster::before { width: 120px; height: 120px; }
       .event-poster::after { width: 95px; height: 95px; }
-      .poster-type { font-size: 29px; }
-      .poster-1 .poster-type { font-size: 32px; }
-      .poster-3 .poster-type { font-size: 25px; }
-      .poster-5 .poster-type { font-size: 24px; }
+      .poster-type { font-size: clamp(17px, 4vw, 24px); }
       .event-info { padding: 11px 9px 10px; }
       .event-info h3 { min-height: 36px; font-size: 15px; }
       .event-meta { font-size: 8px; }
@@ -729,13 +726,13 @@
       <div class="hero-copy">
         <h1>WAS GEHT<br><em>AB?</em></h1>
         <div class="hero-bottom">
-          <p class="hero-intro">Raves, Konzerte, Kickerturniere, Mittelaltermarkt. Was geht, findest du hier — statt irgendwo zwischen Storys und Gruppenchats.</p>
+          <p class="hero-intro">Raves, Konzerte, Szene-Treffen und alternative Angebote. Was geht, findest du hier.</p>
         </div>
       </div>
       <div class="hero-art" aria-label="Abstrakte Illustration einer Schallplatte">
         <span class="art-cross">✳</span>
         <div class="art-disc"><div class="disc-center">✳</div></div>
-        <span class="art-sticker">EVENTS<br>DIE ZU DIR<br>PASSEN</span>
+        <span class="art-sticker">GEILE EVENTS</span>
         <span class="art-caption">Erfurt, Thüringen <span>✳</span></span>
       </div>
     </section>
@@ -866,6 +863,7 @@
         <label class="dialog-field">Preis<input id="eventPrice" maxlength="50" placeholder="Eintritt frei"></label>
         <label class="dialog-field">Poster-Stil<select id="eventPoster"><option value="1">Rosa / Koralle</option><option value="2">Grün</option><option value="3">Flieder</option><option value="4">Sand</option><option value="5">Pink</option><option value="6">Mint</option><option value="7">Gold</option><option value="8">Blau</option></select></label>
       </div>
+      <label class="dialog-field">Bild-URL<input id="eventImageUrl" type="url" maxlength="1000" placeholder="https://…"></label>
       <label class="dialog-field">Poster-Schrift (eine Zeile pro Zeile)<textarea id="eventArt" maxlength="100" rows="2" placeholder="DEIN EVENT"></textarea></label>
       <label class="dialog-field">Kurzbeschreibung<textarea id="eventDescription" maxlength="500" rows="3"></textarea></label>
       <label class="dialog-checkbox"><input id="eventIsPublic" type="checkbox" checked> Öffentlich sichtbar</label>
@@ -1036,6 +1034,16 @@
       })[character]);
     }
 
+    function normalizeImageUrl(value, baseUrl = window.location.href) {
+      if (typeof value !== "string" || !value.trim()) return null;
+      try {
+        const url = new URL(value.trim(), baseUrl);
+        return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+      } catch {
+        return null;
+      }
+    }
+
     function renderEvents() {
       const query = search.value.trim().toLocaleLowerCase("de");
       const filtered = events.filter((event) =>
@@ -1055,19 +1063,36 @@
         return;
       }
 
-      grid.innerHTML = filtered.map((event) => `
-        <article class="event-card">
-          <div class="event-poster poster-${Math.max(1, Math.min(8, Number(event.poster) || 1))}">
-            <span class="poster-label">${escapeHTML(event.type)}</span>
-            <div class="poster-type">${String(event.art || event.title).split(/\n|<br\s*\/?>/i).map(escapeHTML).join("<br>")}</div>
-            <span class="poster-date">${escapeHTML(String(event.date || "").split(" · ")[0])}</span>
-          </div>
-          <div class="event-info">
-            <div class="event-meta"><span class="tag">${escapeHTML(event.type)}</span><span>${escapeHTML(event.date)}</span></div>
-            <h3>${escapeHTML(event.title)}</h3>
-            <div class="event-bottom"><span class="event-location">↗ ${escapeHTML(event.venue)}</span><span class="price">${escapeHTML(event.price)}</span></div>
-          </div>
-        </article>`).join("");
+      grid.innerHTML = filtered.map((event) => {
+        const imageUrl = normalizeImageUrl(event.image_url, event.source_url || window.location.href);
+        return `
+          <article class="event-card">
+            <div class="event-poster poster-${Math.max(1, Math.min(8, Number(event.poster) || 1))}${imageUrl ? " has-image" : ""}">
+              ${imageUrl ? `<img class="event-poster-image" src="${escapeHTML(imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}
+              <span class="poster-label">${escapeHTML(event.type)}</span>
+              <div class="poster-fallback"><div class="poster-type">${String(event.art || event.title).split(/\n|<br\s*\/?>/i).map(escapeHTML).join("<br>")}</div></div>
+              <span class="poster-date">${escapeHTML(String(event.date || "").split(" · ")[0])}</span>
+            </div>
+            <div class="event-info">
+              <div class="event-meta"><span class="tag">${escapeHTML(event.type)}</span><span>${escapeHTML(event.date)}</span></div>
+              <h3>${escapeHTML(event.title)}</h3>
+              <div class="event-bottom"><span class="event-location">↗ ${escapeHTML(event.venue)}</span><span class="price">${escapeHTML(event.price)}</span></div>
+            </div>
+          </article>`;
+      }).join("");
+      grid.querySelectorAll(".poster-type").forEach((posterType) => {
+        let fontSize = Number.parseFloat(getComputedStyle(posterType).fontSize);
+        while (posterType.scrollWidth > posterType.clientWidth + 1 && fontSize > 14) {
+          fontSize -= 1;
+          posterType.style.fontSize = `${fontSize}px`;
+        }
+      });
+      grid.querySelectorAll(".event-poster-image").forEach((image) => {
+        image.addEventListener("error", () => {
+          image.closest(".event-poster").classList.remove("has-image");
+          image.remove();
+        }, { once: true });
+      });
       observeRevealElements(grid);
     }
 
@@ -1174,6 +1199,8 @@
         poster: record.poster,
         art: record.art || record.title,
         description: record.description || "",
+        image_url: record.image_url,
+        source_url: record.source_url,
         is_public: record.is_public,
         status: record.status || "published",
         sort_order: record.sort_order
@@ -1354,6 +1381,7 @@
       document.getElementById("eventVenue").value = record?.venue || "";
       document.getElementById("eventPrice").value = record?.price || "";
       document.getElementById("eventPoster").value = String(record?.poster || 1);
+      document.getElementById("eventImageUrl").value = record?.image_url || "";
       document.getElementById("eventArt").value = (record?.art || "").replace(/<br\s*\/?>/gi, "\n");
       document.getElementById("eventDescription").value = record?.description || "";
       document.getElementById("eventIsPublic").checked = record?.is_public ?? true;
@@ -1373,6 +1401,12 @@
         document.getElementById("eventMessage").textContent = "Bitte gib ein gültiges Datum mit Uhrzeit an.";
         return;
       }
+      const imageUrlInput = document.getElementById("eventImageUrl").value.trim();
+      const imageUrl = normalizeImageUrl(imageUrlInput);
+      if (imageUrlInput && !imageUrl) {
+        document.getElementById("eventMessage").textContent = "Bitte gib eine gültige Bild-URL mit http oder https ein.";
+        return;
+      }
       const payload = {
         title: document.getElementById("eventTitle").value.trim(),
         type: document.getElementById("eventType").value.trim(),
@@ -1382,6 +1416,7 @@
         venue: document.getElementById("eventVenue").value.trim(),
         price: document.getElementById("eventPrice").value.trim() || "Eintritt frei",
         poster: Number(document.getElementById("eventPoster").value),
+        image_url: imageUrl,
         art: document.getElementById("eventArt").value.trim(),
         description: document.getElementById("eventDescription").value.trim(),
         is_public: document.getElementById("eventIsPublic").checked,

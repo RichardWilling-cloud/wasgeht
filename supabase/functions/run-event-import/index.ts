@@ -163,6 +163,30 @@ function extractEventCardBlocks(html) {
   return blocks.sort((a, b) => a.depth - b.depth);
 }
 
+function absoluteImageUrl(value, baseUrl) {
+  if (Array.isArray(value)) return absoluteImageUrl(value.find(Boolean), baseUrl);
+  if (value && typeof value === "object") {
+    return absoluteImageUrl(value.url || value.contentUrl || value["@id"], baseUrl);
+  }
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value.trim().replace(/&amp;/g, "&"), baseUrl);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function imageFromEventCard(cardHtml, baseUrl) {
+  const imageTag = cardHtml.match(/<img\b[^>]*>/i)?.[0];
+  if (!imageTag) return null;
+  const attributes = new Map([...imageTag.matchAll(/([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)]
+    .map((match): [string, string] => [match[1].toLowerCase(), match[2] || match[3] || match[4] || ""]));
+  const imageValues = ["data-src", "data-lazy-src", "data-original", "src"].map((name) => attributes.get(name))
+    .concat(attributes.get("srcset")?.split(",").map((source) => source.trim().split(/\s+/)[0]) || []);
+  return imageValues.map((value) => absoluteImageUrl(value, baseUrl)).find(Boolean) || null;
+}
+
 function candidateFromEventCard(cardHtml, source) {
   const heading = cardHtml.match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
   const namedItem = cardHtml.match(/<[^>]+\bitemprop=["']name["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1];
@@ -198,6 +222,7 @@ function candidateFromEventCard(cardHtml, source) {
     location_name: locationName ? htmlText(locationName) : null,
     address: null,
     source_url: absoluteUrl,
+    image_url: imageFromEventCard(cardHtml, source.url),
     source_type: "website",
     source_name: source.source_name,
   };
@@ -394,6 +419,7 @@ function structuredEventsFromHtml(html, source) {
           location_name: venue || null,
           address: typeof address === "string" ? address : address?.streetAddress || null,
           source_url: item.url || source.url,
+          image_url: absoluteImageUrl(item.image, source.url),
           source_type: "website",
           source_name: source.source_name,
         });
@@ -637,6 +663,7 @@ function normalizeEvent(parsed, candidate, city) {
     price: typeof parsed.price === "string" ? parsed.price.trim().slice(0, 50) : null,
     source_url: candidate.source_url || null,
     source_type: candidate.source_type,
+    image_url: absoluteImageUrl(candidate.image_url, candidate.source_url),
     confidence,
   };
   const needsReview = !title || !start || !location || confidence < 0.6;
@@ -704,7 +731,7 @@ async function saveNewEvent(event, hash, accessToken) {
       address: event.address,
       source_url: event.source_url,
       source_type: event.source_type,
-      image_url: null,
+      image_url: event.image_url,
       origin: "ai",
       content_hash: hash,
       confidence: event.confidence,
@@ -746,6 +773,7 @@ function eventPatch(event, hash) {
     address: event.address,
     source_url: event.source_url,
     source_type: event.source_type,
+    ...(event.image_url ? { image_url: event.image_url } : {}),
     content_hash: hash,
     confidence: event.confidence,
     status: event.status,
@@ -792,7 +820,7 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
     }
     const limitedCandidates = candidates.slice(batchOffset, batchOffset + maxEvents);
     const { data: existing } = await supabaseRequest(
-      `events?select=id,title,type,genre,starts_at,start_datetime,venue,location_name,source_url,origin,content_hash&limit=1000`,
+      `events?select=id,title,type,genre,starts_at,start_datetime,venue,location_name,source_url,image_url,origin,content_hash&limit=1000`,
       accessToken,
     );
     const existingEvents = existing || [];
@@ -820,7 +848,13 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
 
         if (match) {
           if (match.content_hash === hash) {
-            if (!dryRun) await patchEvent(match.id, { last_seen_at: new Date().toISOString() }, accessToken);
+            if (!dryRun) {
+              const patch = {
+                last_seen_at: new Date().toISOString(),
+                ...(event.image_url && !match.image_url ? { image_url: event.image_url } : {}),
+              };
+              await patchEvent(match.id, patch, accessToken);
+            }
             stats.unchanged += 1;
           } else if (dryRun) {
             stats.updated += 1;

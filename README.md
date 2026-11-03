@@ -85,9 +85,24 @@ In Supabase müssen die Auth-Einstellungen ebenfalls auf diese Adresse umgestell
 
 Das SQL-Schema enthält keinen Produktnamen; Accounts, Events und Rollen bleiben im bestehenden Supabase-Projekt erhalten. Der Kontaktlink auf der Website verwendet `hallo@wasgeht.de`; diese Mailbox muss eingerichtet oder im Footer auf eine bereits vorhandene Adresse geändert werden.
 
-## Eigene Domain
+## Eigene Domain: wasgeht-ab.de
 
-Optional kann unter **Repository → Settings → Pages → Custom domain** eine eigene Domain wie `events.example.de` eingetragen werden. Die Domain muss beim DNS-Anbieter mit den von GitHub Pages angegebenen DNS-Einträgen verknüpft werden. Danach in Supabase dieselbe `https://`-Adresse als Site URL und Redirect URL setzen.
+Die Root-Datei [`CNAME`](./CNAME) hält die gewünschte Domain-Zuordnung für Deployments fest. GitHub Pages kann das TLS-Zertifikat erst ausstellen, wenn die DNS-Einträge auf GitHub zeigen. Damit die Domain erreichbar ist:
+
+1. Beim DNS-Anbieter die bisherigen Web-A-/AAAA-Einträge für `@` entfernen und diese vier A-Einträge setzen:
+
+   ```text
+   @  A  185.199.108.153
+   @  A  185.199.109.153
+   @  A  185.199.110.153
+   @  A  185.199.111.153
+   ```
+
+2. Optional `www` als CNAME auf `RichardWilling-cloud.github.io` setzen. Die Root-Domain `wasgeht-ab.de` bleibt die Hauptadresse.
+3. Nach der DNS-Propagation unter **Repository → Settings → Pages** prüfen, dass `wasgeht-ab.de` als Custom domain angezeigt wird und HTTPS aktiviert werden kann. GitHub stellt das TLS-Zertifikat nach erfolgreicher DNS-Prüfung bereit.
+4. In Supabase unter **Authentication → URL Configuration** die **Site URL** auf `https://wasgeht-ab.de` ändern und `https://wasgeht-ab.de/**` unter **Redirect URLs** ergänzen. Optional zusätzlich `https://www.wasgeht-ab.de/**` erlauben, falls `www` verwendet wird.
+
+Die DNS-Propagation kann je nach Anbieter einige Stunden dauern. Bis dahin bleibt die GitHub-Pages-Adresse verfügbar.
 
 ## Lokal testen
 
@@ -107,6 +122,7 @@ Das Projekt enthält jetzt die Datenmodell- und Logik-Basis für einen Admin-Imp
 - `events_archive` sammelt veraltete Einträge, `sources` hält konfigurierbare Quellen für Erfurt fest, und `import_runs` protokolliert jeden Lauf mit Fehlern und Statistiken.
 - Für die Matching-/Archivierungslogik gibt es eine testbare JavaScript-Implementierung in [`event-import.js`](./event-import.js), samt Unit-Tests unter [`tests/event-import.test.js`](./tests/event-import.test.js).
 - In der Admin-Oberfläche kann ein `KI-Import starten`-Button ein Dry-Run oder einen echten Lauf auslösen; die Funktion prüft Admin-Rechte serverseitig und verwaltet die Ergebnis-Zusammenfassung.
+- Eventbilder werden beim Import aus Eventkarten oder Event-Metadaten übernommen, sofern die Quelle sie bereitstellt. Bilder lassen sich außerdem über eine optionale Bild-URL in der Eventverwaltung ergänzen. Fehlt ein Bild oder kann es nicht geladen werden, zeigt die Karte stattdessen ein gestaltetes Textposter.
 
 ### Konfiguration
 
