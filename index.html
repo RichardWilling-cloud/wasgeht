@@ -1475,6 +1475,14 @@
       runImportButton.disabled = true;
       runImportButton.textContent = "Import läuft…";
       importSummary.textContent = "KI-Import läuft…";
+      const dryRun = !!dryRunToggle.checked;
+      const batchStorageKey = `wasgeht-import-offset-${dryRun ? "dry-run" : "live"}`;
+      let batchOffset = 0;
+      try {
+        batchOffset = Number(localStorage.getItem(batchStorageKey)) || 0;
+      } catch (error) {
+        console.warn("Could not read the event import batch position:", error);
+      }
 
       try {
         const { data: sessionData } = await supabaseClient.auth.getSession();
@@ -1493,8 +1501,9 @@
           },
           body: JSON.stringify({
             city: "Erfurt",
-            dryRun: !!dryRunToggle.checked,
-            maxEvents: 25
+            dryRun,
+            maxEvents: 8,
+            batchOffset
           })
         });
 
@@ -1510,7 +1519,18 @@
         const errorDetails = (result.errors || [])
           .map((item) => `${item.source || "Import"}: ${item.message}`)
           .join(" · ");
-        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung, ${errorCount} Quellen-/Verarbeitungsfehler.${errorDetails ? ` ${errorDetails}` : ""}`;
+        const nextOffset = Number(result.next_batch_offset) || 0;
+        const totalCandidates = Number(result.total_candidates) || 0;
+        const batchSummary = totalCandidates
+          ? ` Batch ${Math.min(batchOffset + 1, totalCandidates)}–${nextOffset} von ${totalCandidates}${nextOffset === batchOffset && result.has_more ? " · wegen API-Limit später erneut versuchen" : result.has_more ? " · nächster Teil bereit" : " · vollständig"}.`
+          : "";
+        try {
+          if (result.has_more) localStorage.setItem(batchStorageKey, String(nextOffset));
+          else localStorage.removeItem(batchStorageKey);
+        } catch (error) {
+          console.warn("Could not save the event import batch position:", error);
+        }
+        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung, ${errorCount} Quellen-/Verarbeitungsfehler.${batchSummary}${errorDetails ? ` ${errorDetails}` : ""}`;
         showToast(`Import abgeschlossen: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert.`);
         await loadEventsFromSupabase();
         await loadAdminEvents();

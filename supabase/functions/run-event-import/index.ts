@@ -4,6 +4,7 @@ const SUPABASE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
   || Deno.env.get("SUPABASE_ANON_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
+const IMPORT_BATCH_SIZE = 8;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -545,28 +546,13 @@ const extractionSchema = {
   ],
 };
 
-async function fetchOpenAIWithRetry(options) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", options, 25000);
-    if (response.status !== 429 || attempt === 2) return response;
-
-    const result = await response.clone().json();
-    const message = result.error?.message || "";
-    const retryAfter = response.headers.get("retry-after");
-    const retryAfterSeconds = retryAfter && Number.isFinite(Number(retryAfter))
-      ? Number(retryAfter)
-      : Number(message.match(/try again in ([\d.]+)\s*s/i)?.[1]);
-    const delayMs = Number.isFinite(retryAfterSeconds)
-      ? Math.min(60_000, Math.max(1000, retryAfterSeconds * 1000 + 1000))
-      : Math.min(30_000, 5000 * (attempt + 1));
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
-  throw new Error("OpenAI request failed after rate-limit retries");
+async function fetchOpenAI(options) {
+  return await fetchWithTimeout("https://api.openai.com/v1/chat/completions", options, 12000);
 }
 
 async function extractEvent(candidate, city, now) {
   if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
-  const response = await fetchOpenAIWithRetry({
+  const response = await fetchOpenAI({
     method: "POST",
     headers: {
       Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -768,7 +754,7 @@ function eventPatch(event, hash) {
   };
 }
 
-async function processImport({ city, dryRun, maxEvents, accessToken }) {
+async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken }) {
   const stats = { new: 0, updated: 0, unchanged: 0, archived: 0, needs_review: 0 };
   const errors = [];
   const startedAt = new Date().toISOString();
@@ -790,33 +776,29 @@ async function processImport({ city, dryRun, maxEvents, accessToken }) {
       `sources?select=id,city,source_type,source_name,url,query_text,is_active&city=eq.${encodeURIComponent(city)}&is_active=is.true`,
       accessToken,
     );
-    const candidateBatches = [];
-    for (const source of sources || []) {
+    const candidateBatches = await Promise.all((sources || []).map(async (source) => {
       try {
-        candidateBatches.push(await fetchSourceCandidates(source));
+        return await fetchSourceCandidates(source);
       } catch (error) {
         errors.push({ source: source.source_name, message: error.message });
+        return [];
       }
-    }
-
-    const limitedCandidates = [];
-    for (let index = 0; limitedCandidates.length < maxEvents; index += 1) {
-      let foundCandidate = false;
+    }));
+    const candidates = [];
+    for (let index = 0; candidateBatches.some((batch) => index < batch.length); index += 1) {
       for (const batch of candidateBatches) {
-        if (batch[index]) {
-          limitedCandidates.push(batch[index]);
-          foundCandidate = true;
-          if (limitedCandidates.length === maxEvents) break;
-        }
+        if (batch[index]) candidates.push(batch[index]);
       }
-      if (!foundCandidate) break;
     }
+    const limitedCandidates = candidates.slice(batchOffset, batchOffset + maxEvents);
     const { data: existing } = await supabaseRequest(
       `events?select=id,title,type,genre,starts_at,start_datetime,venue,location_name,source_url,origin,content_hash&limit=1000`,
       accessToken,
     );
     const existingEvents = existing || [];
     const now = new Date().toISOString();
+    let processedCandidates = 0;
+    let batchInterrupted = false;
 
     for (const candidate of limitedCandidates) {
       try {
@@ -824,6 +806,7 @@ async function processImport({ city, dryRun, maxEvents, accessToken }) {
         const event = normalizeEvent(extracted, candidate, city);
         if (!event.title) {
           errors.push({ source: candidate.source_name, message: "Extraction did not produce an event title" });
+          processedCandidates += 1;
           continue;
         }
 
@@ -831,6 +814,7 @@ async function processImport({ city, dryRun, maxEvents, accessToken }) {
         const match = existingEvents.find((item) => isDuplicate(item, event));
         if (match?.origin === "organizer") {
           stats.unchanged += 1;
+          processedCandidates += 1;
           continue;
         }
 
@@ -862,9 +846,14 @@ async function processImport({ city, dryRun, maxEvents, accessToken }) {
           }
         }
         if (event.status === "needs_review") stats.needs_review += 1;
+        processedCandidates += 1;
       } catch (error) {
         errors.push({ source: candidate.source_name, message: error.message });
-        if (isOpenAICreditsError(error) || isOpenAIRateLimitError(error)) break;
+        if (isOpenAICreditsError(error) || isOpenAIRateLimitError(error)) {
+          batchInterrupted = true;
+          break;
+        }
+        processedCandidates += 1;
       }
     }
 
@@ -880,6 +869,10 @@ async function processImport({ city, dryRun, maxEvents, accessToken }) {
       city,
       dryRun,
       source_count: sources?.length || 0,
+      batch_offset: batchOffset,
+      next_batch_offset: batchOffset + processedCandidates,
+      total_candidates: candidates.length,
+      has_more: batchInterrupted || batchOffset + processedCandidates < candidates.length,
       ...stats,
       errors,
     };
@@ -937,9 +930,14 @@ Deno.serve(async (request) => {
   }
   const city = payload.city || "Erfurt";
   if (city !== "Erfurt") return response({ error: "Only Erfurt is supported currently" }, 400);
-  const maxEvents = Number(payload.maxEvents ?? 25);
-  if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 25) {
+  const requestedMaxEvents = Number(payload.maxEvents ?? IMPORT_BATCH_SIZE);
+  if (!Number.isInteger(requestedMaxEvents) || requestedMaxEvents < 1 || requestedMaxEvents > 25) {
     return response({ error: "maxEvents must be an integer between 1 and 25" }, 400);
+  }
+  const maxEvents = Math.min(requestedMaxEvents, IMPORT_BATCH_SIZE);
+  const batchOffset = Number(payload.batchOffset ?? 0);
+  if (!Number.isInteger(batchOffset) || batchOffset < 0 || batchOffset > 1000) {
+    return response({ error: "batchOffset must be an integer between 0 and 1000" }, 400);
   }
 
   try {
@@ -947,6 +945,7 @@ Deno.serve(async (request) => {
       city,
       dryRun: payload.dryRun === true,
       maxEvents,
+      batchOffset,
       accessToken: authorization,
     });
     return response(result);
