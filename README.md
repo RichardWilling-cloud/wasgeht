@@ -28,6 +28,7 @@ Die `sb_publishable_...`-Kennung in `index.html` ist der öffentliche Supabase-C
 ## Vorhandenes GitHub-Repository verbinden und veröffentlichen
 
 Die Website wird bei jedem Push auf `main` automatisch mit GitHub Actions auf GitHub Pages veröffentlicht.
+In der schmalen Statuszeile am oberen Rand zeigt `Live · Datum · #Laufnummer` die veröffentlichte Website-Version. Der zugehörige Commit ist beim Darüberfahren sichtbar. Eine lokale oder noch nicht veröffentlichte Kopie wird stattdessen als `Lokal · nicht veröffentlicht` markiert.
 
 Das Repository liegt unter <https://github.com/RichardWilling-cloud/wasgeht>.
 
@@ -119,15 +120,14 @@ Lokale Variablen sind in `.env.example` dokumentiert. Diese Datei ist nur eine V
 2. Die Edge Function deployen:
 
    ```bash
-   supabase functions deploy run-event-import --project-ref zvhvofgpizwhtxmcnghm
+   supabase functions deploy run-event-import --remote=zvhvofgpizwhtxmcnghm --use-api --yes
    ```
 
 3. `OPENAI_API_KEY` als Supabase Function Secret hinterlegen; `OPENAI_MODEL` ist optional und standardmäßig `gpt-4o-mini`. Ein Google-Search-Secret wird nur benötigt, wenn eine Google-Quelle aktiviert ist.
-4. Im Admin-Bereich auf `KI-Import starten` klicken.
-5. Quelle(n) in `public.sources` aktivieren und `city = 'Erfurt'` setzen.
-6. Die Website-Adapter lesen strukturierte Eventdaten aus JSON-LD oder einzelnen Einträgen des Erfurter Veranstaltungskalenders. Google/Websuche und Instagram bleiben bis zur jeweiligen API-Anbindung deaktiviert.
-7. Die Ergebnisse und Quellenfehler in `public.import_runs` überwachen und `needs_review`-Einträge im Admin-Dialog prüfen.
+4. Für die eigenen Clubquellen den Inhalt von [`supabase/club-sources.sql`](./supabase/club-sources.sql) im Supabase SQL Editor ausführen. Das aktiviert die 13 ausgewählten Erfurter Websites und deaktiviert die bisherigen offiziellen Quellen, Websuche und den Instagram-Platzhalter.
+5. Im Admin-Bereich zuerst einen Dry-Run starten und die Ergebnisse sowie Quellenfehler in `public.import_runs` prüfen. Anschließend `needs_review`-Einträge kontrollieren, bevor ein echter Import gestartet wird.
+6. Die Website-Adapter lesen JSON-LD-Events und erkennbare einzelne Veranstaltungskarten aus. Für Kalif Storch, Triebwerk und den Jazzclub gibt es Kalenderadapter; leere CKB-Terminlisten gelten als gültige leere Quelle. Seiten ohne auslesbare Veranstaltungskarten werden als Quellenfehler ausgewiesen, statt den gesamten Seitentext als vermeintliches Event einzureichen. Für clientseitig geladene Programme kann später eine spezielle Schnittstelle oder ein direkter Kalenderlink ergänzt werden.
 
-Die Function speichert Events ohne belastbares Datum oder Ort nicht als veröffentlicht. Sie nutzt den angemeldeten Admin-JWT mit RLS, schützt Organizer-Events, protokolliert Quellenfehler und archiviert vergangene Events transaktional. Die SQL-Erweiterung plant zusätzlich eine tägliche Archivierung um 03:00 UTC mit `pg_cron`. Ein Dry-Run protokolliert den Lauf, verändert aber keine Events und archiviert nichts. Import-Ergebnisse zeigen die Fehlerdetails direkt in der Admin-Oberfläche.
+Die Function speichert Events ohne belastbares Datum oder Ort nicht als veröffentlicht. Sie nutzt den angemeldeten Admin-JWT mit RLS, schützt Organizer-Events, protokolliert Quellenfehler und archiviert vergangene Events transaktional. Die SQL-Erweiterung plant zusätzlich eine tägliche Archivierung um 03:00 UTC mit `pg_cron`. Ein Dry-Run protokolliert den Lauf, verändert aber keine Events und archiviert nichts. Import-Ergebnisse zeigen die Fehlerdetails direkt in der Admin-Oberfläche. Wenn OpenAI meldet, dass das Guthaben aufgebraucht ist oder ein Rate-Limit erreicht wurde, stoppt die Extraktion beim ersten entsprechenden Fehler. Rate-Limit-Antworten werden zuvor mit dem angegebenen Warteintervall bis zu zweimal wiederholt.
 
 Die serverseitige Implementierung lebt in [`supabase/functions/run-event-import/index.ts`](./supabase/functions/run-event-import/index.ts) und bildet den echten Admin-Import-Lauf ab; dort sind die modularen Quellenadapter, der Admin-Check und die Archivierung bereits integriert.

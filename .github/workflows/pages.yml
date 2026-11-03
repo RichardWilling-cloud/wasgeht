@@ -23,6 +23,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Add website version metadata
+        run: |
+          printf '{"date":"%s","run":"%s","commit":"%s"}\n' \
+            "$(date -u +%Y.%m.%d)" \
+            "$GITHUB_RUN_NUMBER" \
+            "$(git rev-parse --short=7 HEAD)" > version.json
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:

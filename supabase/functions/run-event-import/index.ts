@@ -110,6 +110,218 @@ function dateTimeInBerlin(dateText, timeText) {
   return new Date(utcGuess - offsetMinutes * 60_000).toISOString();
 }
 
+function htmlText(value) {
+  return cleanHtml(value.replace(/<br\s*\/?>/gi, "\n")).replace(/\s+/g, " ").trim();
+}
+
+function isEventCard(tagName, attributes) {
+  const classes = attributes.match(/\bclass=["']([^"']*)["']/i)?.[1] || "";
+  const itemType = attributes.match(/\bitemtype=["']([^"']*)["']/i)?.[1] || "";
+  if (/schema\.org\/Event/i.test(itemType)) return true;
+  if (tagName === "article" || tagName === "event") return true;
+  if (!/\b(event|termin|kcolumn|cd-tile-h-box|accordion)\b/i.test(classes)) return false;
+  return !/\b(events|event-list|event-calendar|event-container|event-wrapper|accordion-list)\b/i.test(classes);
+}
+
+function extractEventCardBlocks(html) {
+  const blocks = [];
+  const stack = [];
+  const tokenRegex = /<!--[\s\S]*?-->|<\/?([a-z][\w:-]*)\b[^>]*>/gi;
+  const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+  const sourceHtml = html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, " ");
+  let token;
+
+  while ((token = tokenRegex.exec(sourceHtml)) !== null) {
+    if (token[0].startsWith("<!--")) continue;
+    const tagName = token[1]?.toLowerCase();
+    if (!tagName) continue;
+
+    if (token[0][1] === "/") {
+      let index = stack.length - 1;
+      while (index >= 0 && stack[index].tagName !== tagName) index -= 1;
+      if (index < 0) continue;
+      const element = stack[index];
+      stack.length = index;
+      if (element.isCandidate) {
+        blocks.push({ html: sourceHtml.slice(element.start, tokenRegex.lastIndex), depth: index });
+      }
+      continue;
+    }
+
+    const attributes = token[0].slice(tagName.length + 1, -1);
+    const selfClosing = /\/\s*>$/.test(token[0]) || voidTags.has(tagName);
+    const element = {
+      tagName,
+      start: token.index,
+      isCandidate: isEventCard(tagName, attributes),
+    };
+    if (!selfClosing) stack.push(element);
+    else if (element.isCandidate) blocks.push({ html: token[0], depth: stack.length });
+  }
+
+  return blocks.sort((a, b) => a.depth - b.depth);
+}
+
+function candidateFromEventCard(cardHtml, source) {
+  const heading = cardHtml.match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
+  const namedItem = cardHtml.match(/<[^>]+\bitemprop=["']name["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1];
+  const accordionTitle = cardHtml.match(/<[^>]+\bclass=["'][^"']*\bevent_title\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1];
+  const jazzTitle = cardHtml.match(/<[^>]+\bclass=["'][^"']*\bcd-tile-h-main-heading\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1];
+  const links = [...cardHtml.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map((match) => ({ href: match[1], text: htmlText(match[2]) }));
+  const detailsHref = links.find((link) => /\/(events?|veranstaltungen|event|termine?)\//i.test(link.href) && link.text);
+  const canonicalTitle = htmlText(heading || namedItem || accordionTitle || jazzTitle || detailsHref?.text || "");
+  if (!canonicalTitle || canonicalTitle.length > 200) return null;
+  if (/^(mehr erfahren|tickets?|veranstaltungen|termine|programm|weiterlesen)$/i.test(canonicalTitle)) return null;
+
+  const text = htmlText(cardHtml);
+  const dateTime = cardHtml.match(/<time\b[^>]*datetime=["']([^"']+)["'][^>]*>/i)?.[1]
+    || cardHtml.match(/\bitemprop=["']startDate["'][^>]*\bcontent=["']([^"']+)["']/i)?.[1]
+    || null;
+  const dateText = text.match(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/)?.[0] || null;
+  const timeArea = cardHtml.match(/<[^>]+\bclass=["'][^"']*\bcd-tile-h-main-subheading\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] || text;
+  const times = [...htmlText(timeArea).matchAll(/\b([01]?\d|2[0-3]):[0-5]\d\b/g)].map((match) => match[0]);
+  const inferredDate = dateText && times.length ? dateTimeInBerlin(dateText, times[0]) : null;
+  const clickHref = cardHtml.match(/\bonclick=["'][^"']*window\.location\.href=['"]([^'"]+)['"]/i)?.[1];
+  const href = detailsHref?.href || clickHref;
+  const absoluteUrl = href ? new URL(href.replace(/&amp;/g, "&"), source.url).toString() : source.url;
+  const locationName = cardHtml.match(/<[^>]+\bclass=["'][^"']*\bcd-tile-h-detail-value\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1];
+
+  return {
+    raw_text: text.slice(0, 5000),
+    title: canonicalTitle,
+    description: null,
+    start_datetime: dateTime || inferredDate,
+    end_datetime: dateText && times.length > 1 ? dateTimeInBerlin(dateText, times[1]) : null,
+    city: "Erfurt",
+    location_name: locationName ? htmlText(locationName) : null,
+    address: null,
+    source_url: absoluteUrl,
+    source_type: "website",
+    source_name: source.source_name,
+  };
+}
+
+function decodeNuxtPayload(payload) {
+  const cache = new Map();
+  const resolve = (index, depth = 0) => {
+    if (!Number.isInteger(index) || index < 0 || index >= payload.length || depth > 50) return null;
+    if (cache.has(index)) return cache.get(index);
+    const raw = payload[index];
+    if (Array.isArray(raw) && ["Reactive", "ShallowReactive"].includes(raw[0])) {
+      return resolve(raw[1], depth + 1);
+    }
+    if (Array.isArray(raw)) {
+      const result = [];
+      cache.set(index, result);
+      result.push(...raw.map((value) => Number.isInteger(value) ? resolve(value, depth + 1) : value));
+      return result;
+    }
+    if (raw && typeof raw === "object") {
+      const result = {};
+      cache.set(index, result);
+      for (const [key, value] of Object.entries(raw)) {
+        result[key] = Number.isInteger(value) ? resolve(value, depth + 1) : value;
+      }
+      return result;
+    }
+    cache.set(index, raw);
+    return raw;
+  };
+  return resolve(0);
+}
+
+async function fetchKalifCandidates(source) {
+  const requestedUrl = new URL(source.url);
+  const pageUrl = requestedUrl.pathname.includes("/events/")
+    ? requestedUrl
+    : new URL("/events/", requestedUrl);
+  const pageResponse = await fetchWithTimeout(pageUrl, {
+    headers: { "User-Agent": "wasgeht-event-import/1.0" },
+  });
+  if (!pageResponse.ok) throw new Error(`Website responded with HTTP ${pageResponse.status}`);
+  const pageHtml = await pageResponse.text();
+  const payloadPath = pageHtml.match(/["']([^"']*\/events\/_payload\.json[^"']*)["']/i)?.[1];
+  if (!payloadPath) throw new Error("Kalif Storch event data payload was not found");
+  const payloadResponse = await fetchWithTimeout(new URL(payloadPath, pageUrl), {
+    headers: { "User-Agent": "wasgeht-event-import/1.0" },
+  });
+  if (!payloadResponse.ok) throw new Error(`Kalif Storch event data responded with HTTP ${payloadResponse.status}`);
+  const pageData = decodeNuxtPayload(await payloadResponse.json());
+  const events = pageData?.data?.["events-de-{}"]?.data;
+  if (!Array.isArray(events)) throw new Error("Kalif Storch event data has an unexpected format");
+
+  const now = Date.now();
+  return events
+    .filter((event) => event?.Titel && event?.Start_Datum && Date.parse(event.End_Datum || event.Start_Datum) >= now)
+    .map((event) => ({
+      raw_text: [
+        event.Titel,
+        event.Start_Datum,
+        event.End_Datum,
+        cleanHtml(event.Beschreibung || ""),
+        cleanHtml(event.Hardfacts || ""),
+      ].filter(Boolean).join("\n").slice(0, 5000),
+      title: event.Titel,
+      description: cleanHtml(event.Beschreibung || "") || null,
+      start_datetime: event.Start_Datum,
+      end_datetime: event.End_Datum || null,
+      city: "Erfurt",
+      location_name: "Kalif Storch",
+      address: null,
+      source_url: new URL(`/events/${encodeURIComponent(event.slug || "")}`, pageUrl).toString(),
+      source_type: "website",
+      source_name: source.source_name,
+    }))
+    .slice(0, 25);
+}
+
+function triebwerkCandidates(html, source) {
+  const candidates = [];
+  const sections = /<section\b(?=[^>]*\bid=["']e-(20\d{2}-\d{2}-\d{2})["'])[^>]*>([\s\S]*?)<\/section>/gi;
+  let match;
+  const now = Date.now();
+  while ((match = sections.exec(html)) !== null) {
+    const [, date, sectionHtml] = match;
+    if (Date.parse(`${date}T23:59:59+01:00`) < now) continue;
+    const dateLabel = htmlText(sectionHtml.match(/<time\b[^>]*>([\s\S]*?)<\/time>/i)?.[1] || date);
+    const category = htmlText(sectionHtml.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] || "");
+    if (!dateLabel || !category) continue;
+    candidates.push({
+      raw_text: `${dateLabel}\n${category}\n${source.source_name}, Erfurt`,
+      title: `${category} im Triebwerk`,
+      description: null,
+      start_datetime: date,
+      end_datetime: null,
+      city: "Erfurt",
+      location_name: "Triebwerk",
+      address: null,
+      source_url: `${new URL(source.url).origin}/#e-${date}`,
+      source_type: "website",
+      source_name: source.source_name,
+    });
+  }
+  return candidates;
+}
+
+function jazzClubCandidates(html, source) {
+  const candidates = [];
+  const dateGroups = /<h3\b[^>]*>([\s\S]*?)<\/h3>([\s\S]*?)(?=<h3\b|$)/gi;
+  let group;
+  while ((group = dateGroups.exec(html)) !== null) {
+    const dateText = htmlText(group[1]).match(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/)?.[0];
+    if (!dateText) continue;
+    for (const block of extractEventCardBlocks(group[2])) {
+      const candidate = candidateFromEventCard(`${dateText} ${block.html}`, source);
+      if (!candidate?.title || !candidate.start_datetime) continue;
+      const eventPath = block.html.match(/window\.location\.href=['"]([^'"]+)['"]/i)?.[1];
+      if (eventPath) candidate.source_url = new URL(eventPath, source.url).toString();
+      candidates.push(candidate);
+    }
+  }
+  return candidates.slice(0, 25);
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -236,16 +448,16 @@ function structuredEventsFromHtml(html, source) {
     return candidates.slice(0, 25);
   }
 
-  const pageText = cleanHtml(html);
-  if (!pageText) return [];
-  return [{
-    raw_text: pageText.slice(0, 8000),
-    title: null,
-    description: null,
-    source_url: source.url,
-    source_type: "website",
-    source_name: source.source_name,
-  }];
+  const seen = new Set();
+  for (const block of extractEventCardBlocks(html)) {
+    const candidate = candidateFromEventCard(block.html, source);
+    if (!candidate) continue;
+    const key = `${normalizeText(candidate.title)}|${candidate.source_url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(candidate);
+  }
+  return candidates.slice(0, 25);
 }
 
 async function fetchWebsiteCandidates(source) {
@@ -258,7 +470,24 @@ async function fetchWebsiteCandidates(source) {
   if (!response.ok) throw new Error(`Website responded with HTTP ${response.status}`);
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("text/html")) throw new Error(`Unsupported content type: ${contentType}`);
-  return structuredEventsFromHtml(await response.text(), source);
+  const html = await response.text();
+  let candidates;
+  if (url.hostname.endsWith("kalifstorch.com")) {
+    return await fetchKalifCandidates(source);
+  } else if (url.hostname === "triebwerk.club") {
+    candidates = triebwerkCandidates(html, source);
+  } else if (url.hostname === "www.jazzclub-erfurt.de" || url.hostname === "jazzclub-erfurt.de") {
+    candidates = jazzClubCandidates(html, source);
+  } else if (url.hostname === "cafe-kunst-bar.com" && /<ul\b[^>]*class=["'][^"']*\bevents\b[^"']*\bdiary\b[^"']*\bfuture\b/i.test(html)) {
+    candidates = structuredEventsFromHtml(html, source);
+    if (!candidates.length) return [];
+  } else {
+    candidates = structuredEventsFromHtml(html, source);
+  }
+  if (!candidates.length) {
+    throw new Error("No event cards found on this page; use the club's dedicated event/programm page if available");
+  }
+  return candidates;
 }
 
 async function fetchGoogleCandidates(source) {
@@ -316,9 +545,28 @@ const extractionSchema = {
   ],
 };
 
+async function fetchOpenAIWithRetry(options) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", options, 25000);
+    if (response.status !== 429 || attempt === 2) return response;
+
+    const result = await response.clone().json();
+    const message = result.error?.message || "";
+    const retryAfter = response.headers.get("retry-after");
+    const retryAfterSeconds = retryAfter && Number.isFinite(Number(retryAfter))
+      ? Number(retryAfter)
+      : Number(message.match(/try again in ([\d.]+)\s*s/i)?.[1]);
+    const delayMs = Number.isFinite(retryAfterSeconds)
+      ? Math.min(60_000, Math.max(1000, retryAfterSeconds * 1000 + 1000))
+      : Math.min(30_000, 5000 * (attempt + 1));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new Error("OpenAI request failed after rate-limit retries");
+}
+
 async function extractEvent(candidate, city, now) {
   if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
-  const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+  const response = await fetchOpenAIWithRetry({
     method: "POST",
     headers: {
       Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -339,7 +587,7 @@ async function extractEvent(candidate, city, now) {
       ],
       max_tokens: 700,
     }),
-  }, 25000);
+  });
 
   const result = await response.json();
   if (!response.ok) {
@@ -434,6 +682,14 @@ function contentForHash(event) {
     address: event.address,
     price: event.price,
   };
+}
+
+function isOpenAICreditsError(error) {
+  return /no credits remaining|insufficient[_ ]quota|billing hard limit|exceeded your current quota/i.test(error.message || "");
+}
+
+function isOpenAIRateLimitError(error) {
+  return /rate limit reached|requests per min|rate_limit_exceeded/i.test(error.message || "");
 }
 
 async function saveNewEvent(event, hash, accessToken) {
@@ -534,16 +790,27 @@ async function processImport({ city, dryRun, maxEvents, accessToken }) {
       `sources?select=id,city,source_type,source_name,url,query_text,is_active&city=eq.${encodeURIComponent(city)}&is_active=is.true`,
       accessToken,
     );
-    const candidates = [];
+    const candidateBatches = [];
     for (const source of sources || []) {
       try {
-        candidates.push(...await fetchSourceCandidates(source));
+        candidateBatches.push(await fetchSourceCandidates(source));
       } catch (error) {
         errors.push({ source: source.source_name, message: error.message });
       }
     }
 
-    const limitedCandidates = candidates.slice(0, maxEvents);
+    const limitedCandidates = [];
+    for (let index = 0; limitedCandidates.length < maxEvents; index += 1) {
+      let foundCandidate = false;
+      for (const batch of candidateBatches) {
+        if (batch[index]) {
+          limitedCandidates.push(batch[index]);
+          foundCandidate = true;
+          if (limitedCandidates.length === maxEvents) break;
+        }
+      }
+      if (!foundCandidate) break;
+    }
     const { data: existing } = await supabaseRequest(
       `events?select=id,title,type,genre,starts_at,start_datetime,venue,location_name,source_url,origin,content_hash&limit=1000`,
       accessToken,
@@ -597,6 +864,7 @@ async function processImport({ city, dryRun, maxEvents, accessToken }) {
         if (event.status === "needs_review") stats.needs_review += 1;
       } catch (error) {
         errors.push({ source: candidate.source_name, message: error.message });
+        if (isOpenAICreditsError(error) || isOpenAIRateLimitError(error)) break;
       }
     }
 

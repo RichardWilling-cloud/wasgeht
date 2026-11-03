@@ -136,6 +136,16 @@
       justify-content: space-between;
     }
     .topline .wrap { gap: 20px; }
+    .site-version {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 9px;
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    .site-version::before { width: 5px; height: 5px; border-radius: 50%; background: currentColor; content: ""; opacity: .65; }
     .live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #e44332; }
     .nav { min-height: 78px; border-bottom: 1px solid var(--line); }
     .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 23px; font-weight: 900; letter-spacing: -.08em; }
@@ -593,7 +603,8 @@
     @media (max-width: 640px) {
       .wrap { width: min(100% - 34px, 480px); }
       .topline { font-size: 9px; }
-      .topline .wrap span:last-child { display: none; }
+      #dataModeLabel { display: none; }
+      .site-version { font-size: 8px; }
       .nav { min-height: 65px; }
       .nav-links, a.submit-link { display: none; }
       .menu-button { display: block; }
@@ -686,6 +697,7 @@
     <div class="wrap">
       <span><i class="live-dot"></i>Deine Events, endlich an einem Ort</span>
       <span id="dataModeLabel">Erfurt &amp; Umgebung · Vorschau</span>
+      <span class="site-version" id="siteVersionLabel" title="Website-Version wird geladen">Version wird geladen</span>
     </div>
   </div>
   <header class="wrap nav">
@@ -864,6 +876,30 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
+    async function loadSiteVersion() {
+      const versionLabel = document.getElementById("siteVersionLabel");
+      try {
+        const versionUrl = new URL("version.json", window.location.href);
+        versionUrl.searchParams.set("t", Date.now().toString());
+        const response = await fetch(versionUrl, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Version file returned HTTP ${response.status}`);
+        const version = await response.json();
+        if (!version.commit || !version.run || !version.date) throw new Error("Version metadata is incomplete");
+        versionLabel.textContent = `Live · ${version.date} · #${version.run}`;
+        versionLabel.title = `Veröffentlichter Commit ${version.commit}`;
+        versionLabel.dataset.commit = version.commit;
+      } catch {
+        const isLocalFile = window.location.protocol === "file:";
+        versionLabel.textContent = isLocalFile ? "Lokal · nicht veröffentlicht" : "Version nicht verfügbar";
+        versionLabel.title = isLocalFile
+          ? "Diese Version ist noch nicht über GitHub Pages veröffentlicht."
+          : "Die Versionsinformationen konnten nicht geladen werden. Lade die Seite neu oder prüfe die Veröffentlichung.";
+        versionLabel.dataset.commit = "";
+      }
+    }
+
+    void loadSiteVersion();
+
     let events = [
       { title: "Bass im Bauch", type: "Rave", genre: "party", date: "Heute · 23:00", dateGroup: "today", place: "city", venue: "Kalif Storch", price: "ab 12 €", poster: 1, art: "BASS<br>IM<br>BAUCH" },
       { title: "Ersti — Semesterstart", type: "Party", genre: "party", date: "Fr · 22:00", dateGroup: "weekend", place: "city", venue: "Museumskeller", price: "ab 6 €", poster: 2, art: "ERSTI<br>PARTY" },
