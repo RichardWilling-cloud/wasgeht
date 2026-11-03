@@ -1,4 +1,4 @@
-# WOANDERS — Erfurt geht raus
+# wasgeht — Erfurt geht raus
 
 Statische Event-Website für Erfurt mit Supabase Auth, Eventdatenbank und Admin-Oberfläche.
 
@@ -29,7 +29,7 @@ Die `sb_publishable_...`-Kennung in `index.html` ist der öffentliche Supabase-C
 
 Die Website wird bei jedem Push auf `main` automatisch mit GitHub Actions auf GitHub Pages veröffentlicht.
 
-Das leere Repository wurde bereits unter <https://github.com/RichardWilling-cloud/woanders> angelegt.
+Das Repository liegt unter <https://github.com/RichardWilling-cloud/wasgeht>.
 
 1. Im Terminal in den Projektordner wechseln:
 
@@ -62,10 +62,27 @@ Das leere Repository wurde bereits unter <https://github.com/RichardWilling-clou
 6. Die Website ist üblicherweise unter dieser Adresse erreichbar:
 
    ```text
-   https://richardwilling-cloud.github.io/woanders/
+   https://richardwilling-cloud.github.io/wasgeht/
    ```
 
 7. Diese exakte URL anschließend in Supabase unter **Authentication → URL Configuration** als **Site URL** eintragen und unter **Redirect URLs** hinzufügen. Danach eine neue Bestätigungs-E-Mail anfordern. Bereits versandte Bestätigungslinks können abgelaufen sein oder noch die alte Weiterleitungsadresse enthalten.
+
+## Nach der Umbenennung zu „wasgeht“
+
+Die veröffentlichte Adresse lautet jetzt:
+
+```text
+https://richardwilling-cloud.github.io/wasgeht/
+```
+
+In Supabase müssen die Auth-Einstellungen ebenfalls auf diese Adresse umgestellt werden:
+
+1. **Authentication → URL Configuration** öffnen.
+2. **Site URL** auf die neue Adresse setzen und sie unter **Redirect URLs** eintragen.
+3. Unter **Authentication → Email Templates** den Produktnamen in den E-Mail-Vorlagen aktualisieren.
+4. Optional unter **Project Settings → General** den angezeigten Projektnamen auf `wasgeht` ändern. Die Projekt-Referenz und URL in `index.html` nicht ändern: Dafür ist keine Datenbankmigration nötig.
+
+Das SQL-Schema enthält keinen Produktnamen; Accounts, Events und Rollen bleiben im bestehenden Supabase-Projekt erhalten. Der Kontaktlink auf der Website verwendet `hallo@wasgeht.de`; diese Mailbox muss eingerichtet oder im Footer auf eine bereits vorhandene Adresse geändert werden.
 
 ## Eigene Domain
 
