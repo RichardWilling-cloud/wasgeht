@@ -172,10 +172,12 @@
     .art-disc::before, .art-disc::after { content: ""; position: absolute; border: 1px solid rgba(23,24,21,.35); border-radius: 50%; }
     .art-disc::before { inset: 9%; }
     .art-disc::after { inset: 18%; }
-    .disc-center { z-index: 1; width: 31%; aspect-ratio: 1; border-radius: 50%; background: var(--orange); display: grid; place-items: center; font-size: 28px; }
+    .disc-center { z-index: 1; width: 31%; aspect-ratio: 1; border-radius: 50%; background: var(--orange); display: grid; place-items: center; }
+    .disc-center .star-mark { width: 44%; height: 44%; }
     .art-sticker { position: absolute; z-index: 2; top: 12%; right: 8%; width: 96px; height: 96px; display: grid; place-items: center; border-radius: 50%; background: var(--orange); color: white; font-size: 11px; font-weight: 800; line-height: 1.15; text-align: center; transform: rotate(12deg); }
     .art-caption { position: absolute; z-index: 2; bottom: 60px; left: 50%; display: flex; width: max-content; max-width: calc(100% - 48px); flex-wrap: nowrap; align-items: center; justify-content: center; gap: .55em; transform: translateX(-50%); color: white; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 5px rgba(55,45,75,.35); }
-    .art-caption span { flex: 0 0 auto; color: var(--acid); font-size: 1.3em; line-height: 1; text-shadow: 0 0 10px rgba(201,217,154,.65); }
+    .art-caption .star-mark { flex: 0 0 auto; width: 1.3em; height: 1.3em; color: var(--acid); filter: drop-shadow(0 0 5px rgba(201,217,154,.65)); }
+    .star-mark { display: block; }
     .art-cross { position: absolute; top: 18%; left: 18%; width: 38px; height: 38px; color: var(--acid); filter: drop-shadow(0 0 8px rgba(201,217,154,.55)); }
     .art-cross svg { display: block; width: 100%; height: 100%; overflow: visible; }
 
@@ -230,7 +232,8 @@
       box-shadow: 0 10px 28px rgba(78,66,95,.07), inset 0 1px 0 rgba(255,255,255,.8);
       backdrop-filter: blur(16px);
     }
-    .organizer-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 15px; background: var(--sticker-glass); color: var(--sticker-text); font-size: 20px; }
+    .organizer-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 15px; background: var(--sticker-glass); color: var(--sticker-text); }
+    .organizer-icon .star-mark { width: 20px; height: 20px; }
     .organizer-feature-label { display: block; margin: 1px 0 6px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
     .organizer-feature h3 { margin: 0 0 5px; font-size: 16px; letter-spacing: -.035em; }
     .organizer-feature p { max-width: 380px; margin: 0; color: var(--body-copy); font-size: 12px; line-height: 1.5; }
@@ -246,6 +249,7 @@
     .results-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 12px; color: var(--muted); font-size: 11px; }
     .search-button { min-width: 145px; }
     .surprise-link { padding: 9px 15px; color: var(--ink); background: var(--control-glass); border-color: rgba(255,255,255,.82); box-shadow: 0 5px 16px rgba(87,67,84,.1), inset 0 1px 0 rgba(255,255,255,.8); }
+    .surprise-link .star-mark { display: inline-block; width: 1em; height: 1em; margin-left: .2em; vertical-align: -.15em; }
     .surprise-link:hover { color: var(--ink); background: var(--surprise-hover); }
     .event-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; }
     .event-card { min-width: 0; border: 1px solid var(--line); background: #f8f6f0; transition: transform .2s, border-color .2s; }
@@ -734,9 +738,9 @@
       </div>
       <div class="hero-art" aria-label="Abstrakte Illustration einer Schallplatte">
         <span class="art-cross" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><path d="M20 2v36M2 20h36M7.3 7.3l25.4 25.4M32.7 7.3 7.3 32.7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"/></svg></span>
-        <div class="art-disc"><div class="disc-center">✳</div></div>
+        <div class="art-disc"><div class="disc-center"><svg class="star-mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M20 3v34M3 20h34M8 8l24 24M32 8 8 32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="3.2"/></svg></div></div>
         <span class="art-sticker">GEILE EVENTS</span>
-        <span class="art-caption">Erfurt, Thüringen <span>✳</span></span>
+        <span class="art-caption">Erfurt, Thüringen <svg class="star-mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M20 3v34M3 20h34M8 8l24 24M32 8 8 32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="3.2"/></svg></span>
       </div>
     </section>
 
@@ -766,7 +770,7 @@
         </div>
         <div class="filter-actions">
           <button class="surprise search-button" id="searchButton" type="button">suchen</button>
-          <button class="surprise surprise-link" id="surpriseButton" type="button">Überrasch mich ✳</button>
+          <button class="surprise surprise-link" id="surpriseButton" type="button">Überrasch mich <svg class="star-mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M20 3v34M3 20h34M8 8l24 24M32 8 8 32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="3.2"/></svg></button>
         </div>
       </div>
       <div class="results-line">
@@ -788,7 +792,7 @@
         </div>
         <div class="organizer-features" aria-label="Möglichkeiten für Veranstalter">
           <article class="organizer-feature">
-            <span class="organizer-icon" aria-hidden="true">✳</span>
+            <span class="organizer-icon" aria-hidden="true"><svg class="star-mark" viewBox="0 0 40 40" focusable="false"><path d="M20 3v34M3 20h34M8 8l24 24M32 8 8 32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="3.2"/></svg></span>
             <div>
               <span class="organizer-feature-label">Öffentlich</span>
               <h3>Dein Event für alle</h3>
