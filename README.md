@@ -125,9 +125,9 @@ Lokale Variablen sind in `.env.example` dokumentiert. Diese Datei ist nur eine V
 3. `OPENAI_API_KEY` als Supabase Function Secret hinterlegen; `OPENAI_MODEL` ist optional und standardmäßig `gpt-4o-mini`. Ein Google-Search-Secret wird nur benötigt, wenn eine Google-Quelle aktiviert ist.
 4. Im Admin-Bereich auf `KI-Import starten` klicken.
 5. Quelle(n) in `public.sources` aktivieren und `city = 'Erfurt'` setzen.
-6. Die Website-Adapter lesen strukturierte Eventdaten aus JSON-LD oder reichen Seitentext zur Extraktion weiter. Die Google-Quelle benötigt SerpAPI; Instagram bleibt bis zur offiziellen API-/Textanbindung deaktiviert.
+6. Die Website-Adapter lesen strukturierte Eventdaten aus JSON-LD oder einzelnen Einträgen des Erfurter Veranstaltungskalenders. Google/Websuche und Instagram bleiben bis zur jeweiligen API-Anbindung deaktiviert.
 7. Die Ergebnisse und Quellenfehler in `public.import_runs` überwachen und `needs_review`-Einträge im Admin-Dialog prüfen.
 
-Die Function speichert Events ohne belastbares Datum oder Ort nicht als veröffentlicht. Sie nutzt den angemeldeten Admin-JWT mit RLS, schützt Organizer-Events, protokolliert Quellenfehler und archiviert vergangene Events transaktional. Die SQL-Erweiterung plant zusätzlich eine tägliche Archivierung um 03:00 UTC mit `pg_cron`. Ein Dry-Run protokolliert den Lauf, verändert aber keine Events und archiviert nichts.
+Die Function speichert Events ohne belastbares Datum oder Ort nicht als veröffentlicht. Sie nutzt den angemeldeten Admin-JWT mit RLS, schützt Organizer-Events, protokolliert Quellenfehler und archiviert vergangene Events transaktional. Die SQL-Erweiterung plant zusätzlich eine tägliche Archivierung um 03:00 UTC mit `pg_cron`. Ein Dry-Run protokolliert den Lauf, verändert aber keine Events und archiviert nichts. Import-Ergebnisse zeigen die Fehlerdetails direkt in der Admin-Oberfläche.
 
 Die serverseitige Implementierung lebt in [`supabase/functions/run-event-import/index.ts`](./supabase/functions/run-event-import/index.ts) und bildet den echten Admin-Import-Lauf ab; dort sind die modularen Quellenadapter, der Admin-Check und die Archivierung bereits integriert.

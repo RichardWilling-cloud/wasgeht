@@ -1471,7 +1471,10 @@
         }
 
         const errorCount = Array.isArray(result.errors) ? result.errors.length : 0;
-        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung, ${errorCount} Quellen-/Verarbeitungsfehler.`;
+        const errorDetails = (result.errors || [])
+          .map((item) => `${item.source || "Import"}: ${item.message}`)
+          .join(" · ");
+        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung, ${errorCount} Quellen-/Verarbeitungsfehler.${errorDetails ? ` ${errorDetails}` : ""}`;
         showToast(`Import abgeschlossen: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert.`);
         await loadEventsFromSupabase();
         await loadAdminEvents();

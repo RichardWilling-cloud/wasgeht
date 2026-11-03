@@ -217,9 +217,9 @@ create table if not exists public.import_runs (
 insert into public.sources (city, source_type, source_name, url, query_text, is_active)
 select seed.city, seed.source_type, seed.source_name, seed.url, seed.query_text, seed.is_active
 from (values
-  ('Erfurt', 'website', 'Erfurt Stadt', 'https://www.erfurt.de/ef/de/leben/events/veranstaltungen/index.html', null, true),
-  ('Erfurt', 'website', 'Stadtmarketing Erfurt', 'https://www.erfurt-tourismus.de/veranstaltungen/', null, true),
-  ('Erfurt', 'google', 'Websuche', null, 'Events Erfurt diese Woche', true),
+  ('Erfurt', 'website', 'Erfurt Stadt', 'https://www.erfurt-tourismus.de/veranstaltungskalender/', null, true),
+  ('Erfurt', 'website', 'Stadtmarketing Erfurt', 'https://www.erfurt-tourismus.de/events-veranstaltungen/', null, false),
+  ('Erfurt', 'google', 'Websuche', null, 'Events Erfurt diese Woche', false),
   ('Erfurt', 'instagram', 'Instagram Placeholder', null, null, false)
 ) as seed(city, source_type, source_name, url, query_text, is_active)
 where not exists (
@@ -227,6 +227,19 @@ where not exists (
   from public.sources existing
   where existing.source_name = seed.source_name
 );
+
+update public.sources
+set url = 'https://www.erfurt-tourismus.de/veranstaltungskalender/',
+    source_type = 'website',
+    query_text = null,
+    is_active = true,
+    updated_at = now()
+where source_name = 'Erfurt Stadt';
+
+update public.sources
+set is_active = false,
+    updated_at = now()
+where source_name in ('Stadtmarketing Erfurt', 'Websuche', 'Instagram Placeholder');
 
 alter table public.events
   alter column starts_at drop not null;

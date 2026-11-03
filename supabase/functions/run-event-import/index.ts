@@ -79,13 +79,35 @@ function cleanHtml(html) {
   return String(html)
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function dateTimeInBerlin(dateText, timeText) {
+  const date = dateText.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  const time = timeText.match(/^(\d{1,2}):(\d{2})$/);
+  if (!date || !time) return null;
+
+  const [, day, month, year] = date.map(Number);
+  const [, hour, minute] = time.map(Number);
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute);
+  const berlinTime = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Berlin",
+    timeZoneName: "shortOffset",
+  }).formatToParts(new Date(utcGuess)).find((part) => part.type === "timeZoneName")?.value;
+  const offset = berlinTime?.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+  if (!offset) return null;
+
+  const offsetMinutes = (Number(offset[2]) * 60 + Number(offset[3] || 0)) * (offset[1] === "-" ? -1 : 1);
+  return new Date(utcGuess - offsetMinutes * 60_000).toISOString();
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
@@ -169,6 +191,51 @@ function structuredEventsFromHtml(html, source) {
   }
 
   if (candidates.length) return candidates.slice(0, 25);
+
+  if (new URL(source.url).pathname.includes("/veranstaltungskalender/")) {
+    const rowRegex = /<div\b[^>]*class=["'][^"']*\brow\s+m-t-sm\s+m-b-sm\b[^"']*["'][^>]*>([\s\S]*?)(?=<div\b[^>]*class=["'][^"']*\bmb-3\s+border-bottom\b|<div\b[^>]*class=["'][^"']*\brow\s+m-t-sm\s+m-b-sm\b|$)/gi;
+    let rowMatch;
+    while ((rowMatch = rowRegex.exec(html)) !== null) {
+      const row = rowMatch[1];
+      const linkMatch = row.match(/<a\b[^>]*href=["']([^"']*\/veranstaltungskalender\/details\/[^"']*)["'][^>]*>([\s\S]*?)<\/a>/i);
+      if (!linkMatch) continue;
+
+      const title = cleanHtml(linkMatch[2]);
+      if (!title) continue;
+      const dateArea = row.match(/<div\b[^>]*class=["'][^"']*\border-md-1\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1] || "";
+      const dateText = cleanHtml(dateArea).match(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/)?.[0] || null;
+      const times = [...dateArea.matchAll(/\b(\d{1,2}:\d{2})\b/g)].map((item) => item[1]);
+      const dateStart = dateText && times[0] ? dateTimeInBerlin(dateText, times[0]) : null;
+      const dateEnd = dateText && times[1] ? dateTimeInBerlin(dateText, times[1]) : null;
+      const description = cleanHtml(row.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] || "");
+      const locationText = cleanHtml(dateArea)
+        .replace(dateText || "", "")
+        .replace(/\b\d{1,2}:\d{2}\b/g, "")
+        .replace(/\b(Mo|Di|Mi|Do|Fr|Sa|So)\b/g, "")
+        .replace(/^[\s-]+|[\s-]+$/g, "")
+        .trim();
+      const absoluteUrl = new URL(linkMatch[1].replace(/&amp;/g, "&"), source.url).toString();
+
+      candidates.push({
+        raw_text: [title, dateText, times.length ? times.join(" - ") : null, locationText, description]
+          .filter(Boolean)
+          .join("\n")
+          .slice(0, 4000),
+        title,
+        description: description || null,
+        start_datetime: dateStart,
+        end_datetime: dateEnd,
+        city: "Erfurt",
+        location_name: locationText || null,
+        address: null,
+        source_url: absoluteUrl,
+        source_type: "website",
+        source_name: source.source_name,
+      });
+    }
+    return candidates.slice(0, 25);
+  }
+
   const pageText = cleanHtml(html);
   if (!pageText) return [];
   return [{
