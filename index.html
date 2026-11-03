@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -700,9 +700,9 @@
         <option>Weimar — bald</option>
         <option>Jena — bald</option>
       </select>
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Dunkles Design einschalten" aria-pressed="false">
-        <span class="theme-icon" aria-hidden="true">☾</span>
-        <span class="theme-label">Nachtmodus</span>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Helles Design einschalten" aria-pressed="true">
+        <span class="theme-icon" aria-hidden="true">☼</span>
+        <span class="theme-label">Hellmodus</span>
       </button>
       <button class="submit-link account-button" id="accountButton" type="button">Anmelden</button>
       <button class="theme-toggle admin-button" id="adminButton" type="button" hidden>Events verwalten</button>
@@ -955,9 +955,9 @@
       themeMeta.content = isDark ? "#2d2b30" : "#f3edf0";
     }
 
-    let savedTheme = "light";
+    let savedTheme = "dark";
     try {
-      savedTheme = localStorage.getItem("wasgeht-theme") === "dark" ? "dark" : "light";
+      savedTheme = localStorage.getItem("wasgeht-theme") === "light" ? "light" : "dark";
     } catch (error) {
       console.warn("Das gespeicherte Design konnte nicht geladen werden.", error);
     }
