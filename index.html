@@ -822,7 +822,16 @@
     <p class="eyebrow">ADMIN-BEREICH</p>
     <h2 id="adminTitle">Events verwalten</h2>
     <div class="admin-toolbar"><p>Events erstellen, bearbeiten, sortieren und sichtbar schalten.</p><button class="surprise" id="createEventButton" type="button">Event erstellen +</button></div>
-    <div class="admin-event-list" id="adminEventList" aria-live="polite"></div>
+    <div class="admin-import-panel" style="margin-top: 18px; padding: 18px; border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; background: rgba(15, 18, 19, 0.32);">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+        <strong>KI-Event-Import</strong>
+        <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted);"><input id="dryRunToggle" type="checkbox"> Testlauf</label>
+      </div>
+      <button class="surprise" id="runImportButton" type="button">KI-Import starten</button>
+      <p class="dialog-message" id="importSummary" role="status" aria-live="polite">Noch kein Import-Lauf.</p>
+      <div class="admin-event-list" id="reviewQueueList" aria-live="polite" style="margin-top: 12px;"></div>
+    </div>
+    <div class="admin-event-list" id="adminEventList" aria-live="polite" style="margin-top: 18px;"></div>
   </dialog>
   <dialog class="app-dialog event-dialog" id="eventDialog" aria-labelledby="eventDialogTitle">
     <button class="dialog-close" type="button" data-close-dialog aria-label="Dialog schließen"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 3.5 9 9m0-9-9 9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg></button>
@@ -892,6 +901,10 @@
         }, { threshold: 0.12 })
       : null;
     let toastTimer;
+    const importSummary = document.getElementById("importSummary");
+    const reviewQueueList = document.getElementById("reviewQueueList");
+    const dryRunToggle = document.getElementById("dryRunToggle");
+    const runImportButton = document.getElementById("runImportButton");
 
     function observeRevealElements(root = document) {
       const selector = root === document
@@ -1203,6 +1216,82 @@
         return;
       }
       renderAdminEvents(data);
+      await loadReviewQueue();
+    }
+
+    function renderReviewQueue(records) {
+      if (!records.length) {
+        reviewQueueList.innerHTML = '<p class="dialog-message">Keine Events warten auf Freigabe.</p>';
+        return;
+      }
+
+      reviewQueueList.innerHTML = records.map((record) => `
+        <article class="admin-event-row">
+          <div class="admin-event-name">
+            <strong>${escapeHTML(record.title)}</strong>
+            <span>${escapeHTML(record.source_type || "manual")} · ${escapeHTML(record.city || "Erfurt")} · ${escapeHTML(formatEventDate(record.start_datetime || record.starts_at))}</span>
+          </div>
+          <div class="admin-event-actions">
+            <button type="button" data-review-action="approve" data-event-id="${escapeHTML(record.id)}">Freigeben</button>
+            <button type="button" data-review-action="edit" data-event-id="${escapeHTML(record.id)}">Bearbeiten</button>
+            <button class="delete-event" type="button" data-review-action="reject" data-event-id="${escapeHTML(record.id)}">Verwerfen</button>
+          </div>
+        </article>`).join("");
+    }
+
+    async function loadReviewQueue() {
+      if (!supabaseClient || signedInRole !== "admin") {
+        reviewQueueList.innerHTML = '<p class="dialog-message">Admin-Rechte nötig.</p>';
+        return;
+      }
+
+      const { data, error } = await supabaseClient
+        .from("events")
+        .select("*")
+        .eq("status", "needs_review")
+        .order("created_at", { ascending: false });
+      if (error) {
+        reviewQueueList.innerHTML = `<p class="dialog-message">Zur-Prüfung-Liste konnte nicht geladen werden: ${escapeHTML(error.message)}</p>`;
+        return;
+      }
+      renderReviewQueue(data || []);
+    }
+
+    async function handleReviewAction(action, eventId) {
+      if (!supabaseClient || signedInRole !== "admin") return;
+      const { data, error } = await supabaseClient.from("events").select("*").eq("id", eventId).maybeSingle();
+      if (error || !data) {
+        showToast("Event für die Prüfung konnte nicht geladen werden.");
+        return;
+      }
+
+      if (action === "approve") {
+        const { error: updateError } = await supabaseClient
+          .from("events")
+          .update({ status: "published", is_public: true, updated_at: new Date().toISOString() })
+          .eq("id", eventId);
+        if (updateError) {
+          showToast(`Freigabe fehlgeschlagen: ${updateError.message}`);
+          return;
+        }
+      }
+
+      if (action === "reject") {
+        const { error: rejectError } = await supabaseClient.from("events").delete().eq("id", eventId);
+        if (rejectError) {
+          showToast(`Event konnte nicht verworfen werden: ${rejectError.message}`);
+          return;
+        }
+      }
+
+      if (action === "edit") {
+        openEventEditor(data);
+        return;
+      }
+
+      await loadEventsFromSupabase();
+      await loadAdminEvents();
+      showToast(action === "approve" ? "Event wurde freigegeben." : "Event wurde verworfen.");
     }
 
     function openEventEditor(record = null) {
@@ -1334,6 +1423,43 @@
       }
     }
 
+    async function runImport() {
+      if (!supabaseClient || signedInRole !== "admin") {
+        showToast("Der KI-Import ist nur für Admins verfügbar.");
+        return;
+      }
+
+      runImportButton.disabled = true;
+      runImportButton.textContent = "Import läuft…";
+      importSummary.textContent = "KI-Import läuft…";
+
+      try {
+        const { data, error } = await supabaseClient.rpc("runEventImport", {
+          p_city: "Erfurt",
+          p_dry_run: !!dryRunToggle.checked,
+          p_max_events: 25
+        });
+
+        if (error) {
+          importSummary.textContent = `Import fehlgeschlagen: ${error.message}`;
+          showToast(`Import fehlgeschlagen: ${error.message}`);
+          return;
+        }
+
+        const result = data || {};
+        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung.`;
+        showToast(`Import abgeschlossen: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert.`);
+        await loadEventsFromSupabase();
+        await loadAdminEvents();
+      } catch (exception) {
+        importSummary.textContent = `Import fehlgeschlagen: ${exception.message}`;
+        showToast(`Import fehlgeschlagen: ${exception.message}`);
+      } finally {
+        runImportButton.disabled = false;
+        runImportButton.textContent = "KI-Import starten";
+      }
+    }
+
     document.getElementById("accountButton").addEventListener("click", openAuthDialog);
     document.getElementById("authModeToggle").addEventListener("click", () => {
       isRegisterMode = !isRegisterMode;
@@ -1389,9 +1515,14 @@
       if (signedInRole === "admin") adminDialog.showModal();
     });
     document.getElementById("createEventButton").addEventListener("click", () => openEventEditor());
+    runImportButton.addEventListener("click", () => void runImport());
     adminEventList.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-admin-action]");
       if (button) void handleAdminEventAction(button.dataset.adminAction, button.dataset.eventId, button);
+    });
+    reviewQueueList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-review-action]");
+      if (button) void handleReviewAction(button.dataset.reviewAction, button.dataset.eventId);
     });
     document.getElementById("eventForm").addEventListener("submit", saveEvent);
     document.querySelectorAll("[data-close-dialog]").forEach((button) => {

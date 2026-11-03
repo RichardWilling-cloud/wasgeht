@@ -97,3 +97,37 @@ python3 -m http.server 8000
 ```
 
 Dann `http://localhost:8000/` im Browser aufrufen und diese Adresse während des lokalen Tests zusätzlich in Supabase als Redirect URL eintragen.
+
+## KI-Event-Import
+
+Das Projekt enthält jetzt die Datenmodell- und Logik-Basis für einen Admin-Importlauf mit dem Namen `runEventImport`.
+
+- Die aktive Eventtabelle wurde um Felder wie `category`, `origin`, `confidence`, `status`, `source_type`, `content_hash`, `city`, `source_url` und `last_seen_at` erweitert.
+- `events_archive` sammelt veraltete Einträge, `sources` hält konfigurierbare Quellen für Erfurt fest, und `import_runs` protokolliert jeden Lauf mit Fehlern und Statistiken.
+- Für die Matching-/Archivierungslogik gibt es eine testbare JavaScript-Implementierung in [`event-import.js`](./event-import.js), samt Unit-Tests unter [`tests/event-import.test.js`](./tests/event-import.test.js).
+- In der Admin-Oberfläche kann ein `KI-Import starten`-Button ein Dry-Run oder einen echten Lauf auslösen; die Funktion prüft Admin-Rechte serverseitig und verwaltet die Ergebnis-Zusammenfassung.
+
+### Konfiguration
+
+```bash
+cp .env.example .env
+```
+
+Erforderliche Werte:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (nur für Server-/Edge-Workflows, nicht im Browser)
+- `EVENT_IMPORT_CITY=Erfurt`
+- `EVENT_IMPORT_MAX_EVENTS=25`
+- `OPENAI_API_KEY` bzw. ein anderer LLM-Key, falls der Import mit einem echten LLM-Adapter ergänzt wird.
+
+### Ablauf für den echten Import
+
+1. In Supabase die SQL-Erweiterungen aus `supabase-schema.sql` einspielen.
+2. Im Admin-Bereich auf `KI-Import starten` klicken.
+3. Quelle(n) in `public.sources` aktivieren und `city = 'Erfurt'` setzen.
+4. Bei einem echten LLM-Adapter die URL- und Prompt-Parameter im Adapter ergänzen und die Importfunktion koppeln.
+5. Die Ergebnisse in `public.import_runs` überwachen und die `needs_review`-Einträge im Admin-Dialog prüfen.
+
+Die Logik ist so aufgebaut, dass sie idempotent arbeitet, Organizer-Events schützt und vergangene Einträge automatisch in die Archiv-Tabelle verschiebt.

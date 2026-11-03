@@ -161,3 +161,164 @@ $$;
 revoke all on function public.create_profile_for_new_user() from public, anon, authenticated;
 revoke all on function public.move_event(uuid, integer) from public;
 grant execute on function public.move_event(uuid, integer) to authenticated;
+
+alter table public.events
+  add column if not exists category text not null default 'Party' check (category in ('Party', 'Rave', 'Konzert', 'Club', 'Festival', 'Workshop', 'Markt', 'LARP', 'Community', 'Kultur', 'Outdoor')),
+  add column if not exists tags text[] not null default '{}',
+  add column if not exists start_datetime timestamptz,
+  add column if not exists end_datetime timestamptz,
+  add column if not exists city text,
+  add column if not exists location_name text,
+  add column if not exists address text,
+  add column if not exists source_url text,
+  add column if not exists source_type text not null default 'manual' check (source_type in ('instagram', 'google', 'website', 'manual')),
+  add column if not exists image_url text,
+  add column if not exists origin text not null default 'organizer' check (origin in ('ai', 'organizer')),
+  add column if not exists content_hash text,
+  add column if not exists confidence double precision not null default 1 check (confidence >= 0 and confidence <= 1),
+  add column if not exists status text not null default 'published' check (status in ('published', 'needs_review')),
+  add column if not exists updated_at timestamptz not null default now(),
+  add column if not exists last_seen_at timestamptz not null default now();
+
+create table if not exists public.events_archive (
+  like public.events including defaults,
+  archived_at timestamptz not null default now(),
+  archive_reason text not null default 'past_event'
+);
+
+create table if not exists public.sources (
+  id uuid primary key default gen_random_uuid(),
+  city text not null default 'Erfurt',
+  source_type text not null check (source_type in ('website', 'google', 'instagram', 'manual')),
+  source_name text not null,
+  url text,
+  query_text text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.import_runs (
+  id uuid primary key default gen_random_uuid(),
+  city text not null,
+  dry_run boolean not null default false,
+  max_events integer not null default 25,
+  source_count integer not null default 0,
+  new_events integer not null default 0,
+  updated_events integer not null default 0,
+  unchanged_events integer not null default 0,
+  archived_events integer not null default 0,
+  review_events integer not null default 0,
+  errors jsonb not null default '[]'::jsonb,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+
+insert into public.sources (city, source_type, source_name, url, query_text, is_active)
+values
+  ('Erfurt', 'website', 'Erfurt Stadt', 'https://www.erfurt.de/ef/de/leben/events/veranstaltungen/index.html', null, true),
+  ('Erfurt', 'website', 'Stadtmarketing Erfurt', 'https://www.erfurt-tourismus.de/veranstaltungen/', null, true),
+  ('Erfurt', 'google', 'Websuche', null, 'Events Erfurt diese Woche', true),
+  ('Erfurt', 'instagram', 'Instagram Placeholder', 'https://www.instagram.com/explore/tags/erfurt/', null, false);
+
+create or replace function public.runEventImport(p_city text default 'Erfurt', p_dry_run boolean default false, p_max_events integer default 25)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_admin boolean;
+  v_city text := coalesce(nullif(trim(p_city), ''), 'Erfurt');
+  v_limit integer := coalesce(p_max_events, 25);
+  v_source_count integer := 0;
+  v_new integer := 0;
+  v_updated integer := 0;
+  v_unchanged integer := 0;
+  v_review integer := 0;
+  v_archived integer := 0;
+  v_run_id uuid;
+  v_error jsonb := '[]'::jsonb;
+begin
+  v_admin := (select public.is_admin());
+  if not v_admin then
+    raise exception 'Admin access required';
+  end if;
+
+  if v_limit is null or v_limit < 1 then
+    v_limit := 25;
+  end if;
+
+  select count(*) into v_source_count
+  from public.sources
+  where city = v_city and is_active = true;
+
+  insert into public.import_runs (
+    city,
+    dry_run,
+    max_events,
+    source_count,
+    errors,
+    started_at
+  ) values (
+    v_city,
+    p_dry_run,
+    v_limit,
+    v_source_count,
+    v_error,
+    now()
+  ) returning id into v_run_id;
+
+  with expired_events as (
+    select id, start_datetime, end_datetime from public.events
+    where (end_datetime is not null and end_datetime < now())
+       or (end_datetime is null and start_datetime is not null and start_datetime < now())
+  )
+  insert into public.events_archive (id, title, description, category, tags, start_datetime, end_datetime, city, location_name, address, price, source_url, source_type, image_url, is_public, origin, content_hash, confidence, status, created_at, updated_at, last_seen_at, archived_at, archive_reason)
+  select e.id, e.title, e.description, coalesce(e.category, 'Party'), e.tags, e.start_datetime, e.end_datetime, e.city, e.location_name, e.address, e.price, e.source_url, e.source_type, e.image_url, e.is_public, e.origin, e.content_hash, e.confidence, e.status, e.created_at, e.updated_at, e.last_seen_at, now(), 'past_event'
+  from public.events e
+  join expired_events ex on ex.id = e.id
+  on conflict (id) do nothing;
+
+  delete from public.events e
+  using (
+    select id from public.events
+    where (end_datetime is not null and end_datetime < now())
+       or (end_datetime is null and start_datetime is not null and start_datetime < now())
+  ) expired
+  where e.id = expired.id;
+
+  get diagnostics v_archived = row_count;
+
+  update public.import_runs
+  set new_events = v_new,
+      updated_events = v_updated,
+      unchanged_events = v_unchanged,
+      archived_events = v_archived,
+      review_events = v_review,
+      errors = v_error,
+      finished_at = now()
+  where id = v_run_id;
+
+  return jsonb_build_object(
+    'city', v_city,
+    'dry_run', p_dry_run,
+    'source_count', v_source_count,
+    'new', v_new,
+    'updated', v_updated,
+    'unchanged', v_unchanged,
+    'archived', v_archived,
+    'needs_review', v_review,
+    'errors', v_error,
+    'run_id', v_run_id::text
+  );
+end;
+$$;
+
+revoke all on function public.runEventImport(text, boolean, integer) from public;
+grant execute on function public.runEventImport(text, boolean, integer) to authenticated;
+
+create unique index if not exists events_archive_pkey_idx on public.events_archive (id);
+create index if not exists events_status_idx on public.events (status, is_public, city, start_datetime);
+create index if not exists events_source_idx on public.events (source_type, last_seen_at);
+create index if not exists sources_city_active_idx on public.sources (city, is_active);
