@@ -30,21 +30,13 @@ Die `sb_publishable_...`-Kennung in `index.html` ist der öffentliche Supabase-C
 Die Website wird bei jedem Push auf `main` automatisch mit GitHub Actions auf GitHub Pages veröffentlicht.
 
 1. Auf GitHub **New repository** erstellen, zum Beispiel `woanders-erfurt`. Das Repository leer anlegen: kein README, keine Lizenz und kein `.gitignore` hinzufügen. Für kostenlose GitHub-Pages-Veröffentlichung das Repository öffentlich anlegen.
-2. Im Terminal in den Projektordner wechseln:
+2. Im Terminal in den bereits initialisierten Projektordner wechseln:
 
    ```sh
    cd "/Users/richardwilling/.copilot/chats/021713ba-51d7-48e1-88b0-097457016b16"
    ```
 
-3. Das lokale Repository erstmalig committen (falls dies noch nicht erledigt ist):
-
-   ```sh
-   git init -b main
-   git add index.html supabase-schema.sql README.md .gitignore .github/workflows/pages.yml
-   git commit -m "Initial WOANDERS website"
-   ```
-
-4. `DEIN-GITHUB-NAME` durch deinen GitHub-Benutzernamen oder deine Organisation ersetzen und das leere Repository verbinden:
+3. `DEIN-GITHUB-NAME` durch deinen GitHub-Benutzernamen oder deine Organisation ersetzen und das leere Repository verbinden:
 
    ```sh
    git remote add origin https://github.com/DEIN-GITHUB-NAME/woanders-erfurt.git
@@ -53,14 +45,14 @@ Die Website wird bei jedem Push auf `main` automatisch mit GitHub Actions auf Gi
 
    GitHub öffnet bei Bedarf seinen Anmeldedialog für Git Credential Manager. Kein Passwort oder Token in den Befehl schreiben.
 
-5. Im GitHub-Repository **Settings → Pages** öffnen. Als Build and deployment source **GitHub Actions** wählen. Falls der Workflow bereits läuft, den Lauf unter **Actions** prüfen; bei Bedarf einmal **Run workflow** ausführen.
-6. Die Website ist üblicherweise unter dieser Adresse erreichbar:
+4. Im GitHub-Repository **Settings → Pages** öffnen. Als Build and deployment source **GitHub Actions** wählen. Falls der Workflow bereits läuft, den Lauf unter **Actions** prüfen; bei Bedarf einmal **Run workflow** ausführen.
+5. Die Website ist üblicherweise unter dieser Adresse erreichbar:
 
    ```text
    https://DEIN-GITHUB-NAME.github.io/woanders-erfurt/
    ```
 
-7. Diese exakte URL anschließend in Supabase unter **Authentication → URL Configuration** als **Site URL** eintragen und unter **Redirect URLs** hinzufügen. Danach eine neue Bestätigungs-E-Mail anfordern. Bereits versandte Bestätigungslinks können abgelaufen sein oder noch die alte Weiterleitungsadresse enthalten.
+6. Diese exakte URL anschließend in Supabase unter **Authentication → URL Configuration** als **Site URL** eintragen und unter **Redirect URLs** hinzufügen. Danach eine neue Bestätigungs-E-Mail anfordern. Bereits versandte Bestätigungslinks können abgelaufen sein oder noch die alte Weiterleitungsadresse enthalten.
 
 ## Eigene Domain
 
