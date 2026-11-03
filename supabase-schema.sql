@@ -215,110 +215,153 @@ create table if not exists public.import_runs (
 );
 
 insert into public.sources (city, source_type, source_name, url, query_text, is_active)
-values
+select seed.city, seed.source_type, seed.source_name, seed.url, seed.query_text, seed.is_active
+from (values
   ('Erfurt', 'website', 'Erfurt Stadt', 'https://www.erfurt.de/ef/de/leben/events/veranstaltungen/index.html', null, true),
   ('Erfurt', 'website', 'Stadtmarketing Erfurt', 'https://www.erfurt-tourismus.de/veranstaltungen/', null, true),
   ('Erfurt', 'google', 'Websuche', null, 'Events Erfurt diese Woche', true),
-  ('Erfurt', 'instagram', 'Instagram Placeholder', 'https://www.instagram.com/explore/tags/erfurt/', null, false);
+  ('Erfurt', 'instagram', 'Instagram Placeholder', null, null, false)
+) as seed(city, source_type, source_name, url, query_text, is_active)
+where not exists (
+  select 1
+  from public.sources existing
+  where existing.source_name = seed.source_name
+);
 
-create or replace function public.runEventImport(p_city text default 'Erfurt', p_dry_run boolean default false, p_max_events integer default 25)
-returns jsonb
+alter table public.events
+  alter column starts_at drop not null;
+
+create unique index if not exists events_archive_pkey_idx
+  on public.events_archive (id);
+create index if not exists events_status_idx on public.events (status, is_public, city, start_datetime);
+create index if not exists events_source_idx on public.events (source_type, last_seen_at);
+create index if not exists sources_city_active_idx on public.sources (city, is_active);
+create unique index if not exists events_ai_source_hash_uidx
+  on public.events (source_url, content_hash)
+  where origin = 'ai' and source_url is not null and content_hash is not null;
+
+alter table public.events_archive enable row level security;
+alter table public.sources enable row level security;
+alter table public.import_runs enable row level security;
+
+drop policy if exists "Admins manage event sources" on public.sources;
+create policy "Admins manage event sources"
+  on public.sources
+  for all
+  to authenticated
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
+
+drop policy if exists "Admins manage import runs" on public.import_runs;
+create policy "Admins manage import runs"
+  on public.import_runs
+  for all
+  to authenticated
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
+
+drop policy if exists "Admins manage event archive" on public.events_archive;
+create policy "Admins manage event archive"
+  on public.events_archive
+  for all
+  to authenticated
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
+
+revoke all on public.sources, public.import_runs, public.events_archive from anon, authenticated;
+grant select, insert, update, delete on public.sources, public.import_runs, public.events_archive to authenticated;
+
+drop policy if exists "Public reads visible events and admins read all" on public.events;
+create policy "Public reads visible events and admins read all"
+  on public.events
+  for select
+  to anon, authenticated
+  using ((is_public and status = 'published') or (select public.is_admin()));
+
+create or replace function public.archive_expired_events_internal()
+returns integer
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  v_admin boolean;
-  v_city text := coalesce(nullif(trim(p_city), ''), 'Erfurt');
-  v_limit integer := coalesce(p_max_events, 25);
-  v_source_count integer := 0;
-  v_new integer := 0;
-  v_updated integer := 0;
-  v_unchanged integer := 0;
-  v_review integer := 0;
-  v_archived integer := 0;
-  v_run_id uuid;
-  v_error jsonb := '[]'::jsonb;
+  archived_count integer;
 begin
-  v_admin := (select public.is_admin());
-  if not v_admin then
-    raise exception 'Admin access required';
-  end if;
+  perform pg_advisory_xact_lock(hashtext('public.events.archive'));
 
-  if v_limit is null or v_limit < 1 then
-    v_limit := 25;
-  end if;
-
-  select count(*) into v_source_count
-  from public.sources
-  where city = v_city and is_active = true;
-
-  insert into public.import_runs (
-    city,
-    dry_run,
-    max_events,
-    source_count,
-    errors,
-    started_at
-  ) values (
-    v_city,
-    p_dry_run,
-    v_limit,
-    v_source_count,
-    v_error,
-    now()
-  ) returning id into v_run_id;
-
-  with expired_events as (
-    select id, start_datetime, end_datetime from public.events
-    where (end_datetime is not null and end_datetime < now())
-       or (end_datetime is null and start_datetime is not null and start_datetime < now())
+  with expired as (
+    select id
+    from public.events
+    where coalesce(end_datetime, start_datetime, starts_at) < now()
+  ),
+  moved as (
+    insert into public.events_archive (
+      id, title, type, genre, starts_at, date_group, place, venue, price, poster,
+      art, description, is_public, sort_order, created_at, category, tags,
+      start_datetime, end_datetime, city, location_name, address, source_url,
+      source_type, image_url, origin, content_hash, confidence, status, updated_at,
+      last_seen_at, archived_at, archive_reason
+    )
+    select
+      e.id, e.title, e.type, e.genre, e.starts_at, e.date_group, e.place, e.venue,
+      e.price, e.poster, e.art, e.description, e.is_public, e.sort_order, e.created_at,
+      e.category, e.tags, e.start_datetime, e.end_datetime, e.city, e.location_name,
+      e.address, e.source_url, e.source_type, e.image_url, e.origin, e.content_hash,
+      e.confidence, e.status, e.updated_at, e.last_seen_at, now(), 'past_event'
+    from public.events e
+    join expired x on x.id = e.id
+    on conflict (id) do nothing
+    returning id
+  ),
+  deleted as (
+    delete from public.events e
+    using expired x
+    where e.id = x.id
+    returning e.id
   )
-  insert into public.events_archive (id, title, description, category, tags, start_datetime, end_datetime, city, location_name, address, price, source_url, source_type, image_url, is_public, origin, content_hash, confidence, status, created_at, updated_at, last_seen_at, archived_at, archive_reason)
-  select e.id, e.title, e.description, coalesce(e.category, 'Party'), e.tags, e.start_datetime, e.end_datetime, e.city, e.location_name, e.address, e.price, e.source_url, e.source_type, e.image_url, e.is_public, e.origin, e.content_hash, e.confidence, e.status, e.created_at, e.updated_at, e.last_seen_at, now(), 'past_event'
-  from public.events e
-  join expired_events ex on ex.id = e.id
-  on conflict (id) do nothing;
+  select count(*) into archived_count from deleted;
 
-  delete from public.events e
-  using (
-    select id from public.events
-    where (end_datetime is not null and end_datetime < now())
-       or (end_datetime is null and start_datetime is not null and start_datetime < now())
-  ) expired
-  where e.id = expired.id;
-
-  get diagnostics v_archived = row_count;
-
-  update public.import_runs
-  set new_events = v_new,
-      updated_events = v_updated,
-      unchanged_events = v_unchanged,
-      archived_events = v_archived,
-      review_events = v_review,
-      errors = v_error,
-      finished_at = now()
-  where id = v_run_id;
-
-  return jsonb_build_object(
-    'city', v_city,
-    'dry_run', p_dry_run,
-    'source_count', v_source_count,
-    'new', v_new,
-    'updated', v_updated,
-    'unchanged', v_unchanged,
-    'archived', v_archived,
-    'needs_review', v_review,
-    'errors', v_error,
-    'run_id', v_run_id::text
-  );
+  return archived_count;
 end;
 $$;
 
-revoke all on function public.runEventImport(text, boolean, integer) from public;
-grant execute on function public.runEventImport(text, boolean, integer) to authenticated;
+revoke all on function public.archive_expired_events_internal() from public, anon, authenticated;
 
-create unique index if not exists events_archive_pkey_idx on public.events_archive (id);
-create index if not exists events_status_idx on public.events (status, is_public, city, start_datetime);
-create index if not exists events_source_idx on public.events (source_type, last_seen_at);
-create index if not exists sources_city_active_idx on public.sources (city, is_active);
+create or replace function public.archive_expired_events()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not (select public.is_admin()) then
+    raise exception 'Admin access required';
+  end if;
+  return public.archive_expired_events_internal();
+end;
+$$;
+
+revoke all on function public.archive_expired_events() from public, anon;
+grant execute on function public.archive_expired_events() to authenticated;
+
+drop function if exists public.runeventimport(text, boolean, integer);
+
+create extension if not exists pg_cron;
+
+do $$
+declare
+  existing_job_id bigint;
+begin
+  select jobid into existing_job_id
+  from cron.job
+  where jobname = 'wasgeht-archive-expired-events';
+  if existing_job_id is not null then
+    perform cron.unschedule(existing_job_id);
+  end if;
+  perform cron.schedule(
+    'wasgeht-archive-expired-events',
+    '0 3 * * *',
+    'select public.archive_expired_events_internal();'
+  );
+end;
+$$;

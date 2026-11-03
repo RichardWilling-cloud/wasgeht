@@ -109,25 +109,25 @@ Das Projekt enthält jetzt die Datenmodell- und Logik-Basis für einen Admin-Imp
 
 ### Konfiguration
 
-```bash
-cp .env.example .env
-```
+Für den Edge Function Import ist `OPENAI_API_KEY` als Supabase Function Secret erforderlich. Optional ermöglicht `GOOGLE_SEARCH_API_KEY` Websuche über SerpAPI. Supabase-REST-Aufrufe laufen mit dem angemeldeten Admin-JWT und der Publishable-/Anon-Key-Konfiguration; ein service-role/secret key wird von der Function nicht benötigt.
 
-Erforderliche Werte:
-
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (nur für Server-/Edge-Workflows, nicht im Browser)
-- `EVENT_IMPORT_CITY=Erfurt`
-- `EVENT_IMPORT_MAX_EVENTS=25`
-- `OPENAI_API_KEY` bzw. ein anderer LLM-Key, falls der Import mit einem echten LLM-Adapter ergänzt wird.
+Lokale Variablen sind in `.env.example` dokumentiert. Diese Datei ist nur eine Vorlage und wird nicht automatisch von Supabase Edge Functions geladen.
 
 ### Ablauf für den echten Import
 
 1. In Supabase die SQL-Erweiterungen aus `supabase-schema.sql` einspielen.
-2. Im Admin-Bereich auf `KI-Import starten` klicken.
-3. Quelle(n) in `public.sources` aktivieren und `city = 'Erfurt'` setzen.
-4. Bei einem echten LLM-Adapter die URL- und Prompt-Parameter im Adapter ergänzen und die Importfunktion koppeln.
-5. Die Ergebnisse in `public.import_runs` überwachen und die `needs_review`-Einträge im Admin-Dialog prüfen.
+2. Die Edge Function deployen:
 
-Die Logik ist so aufgebaut, dass sie idempotent arbeitet, Organizer-Events schützt und vergangene Einträge automatisch in die Archiv-Tabelle verschiebt.
+   ```bash
+   supabase functions deploy run-event-import --project-ref zvhvofgpizwhtxmcnghm
+   ```
+
+3. `OPENAI_API_KEY` als Supabase Function Secret hinterlegen; `OPENAI_MODEL` ist optional und standardmäßig `gpt-4o-mini`. Ein Google-Search-Secret wird nur benötigt, wenn eine Google-Quelle aktiviert ist.
+4. Im Admin-Bereich auf `KI-Import starten` klicken.
+5. Quelle(n) in `public.sources` aktivieren und `city = 'Erfurt'` setzen.
+6. Die Website-Adapter lesen strukturierte Eventdaten aus JSON-LD oder reichen Seitentext zur Extraktion weiter. Die Google-Quelle benötigt SerpAPI; Instagram bleibt bis zur offiziellen API-/Textanbindung deaktiviert.
+7. Die Ergebnisse und Quellenfehler in `public.import_runs` überwachen und `needs_review`-Einträge im Admin-Dialog prüfen.
+
+Die Function speichert Events ohne belastbares Datum oder Ort nicht als veröffentlicht. Sie nutzt den angemeldeten Admin-JWT mit RLS, schützt Organizer-Events, protokolliert Quellenfehler und archiviert vergangene Events transaktional. Die SQL-Erweiterung plant zusätzlich eine tägliche Archivierung um 03:00 UTC mit `pg_cron`. Ein Dry-Run protokolliert den Lauf, verändert aber keine Events und archiviert nichts.
+
+Die serverseitige Implementierung lebt in [`supabase/functions/run-event-import/index.js`](./supabase/functions/run-event-import/index.js) und bildet den echten Admin-Import-Lauf ab; dort sind die modularen Quellenadapter, der Admin-Check und die Archivierung bereits integriert.

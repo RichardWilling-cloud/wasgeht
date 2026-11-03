@@ -1,0 +1,4 @@
+project_id = "zvhvofgpizwhtxmcnghm"
+
+[functions.run-event-import]
+verify_jwt = true

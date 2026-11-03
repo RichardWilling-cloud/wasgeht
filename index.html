@@ -997,7 +997,10 @@
 
     function renderEvents() {
       const query = search.value.trim().toLocaleLowerCase("de");
-      const filtered = events.filter((event) => event.is_public !== false || signedInRole === "admin").filter((event) => {
+      const filtered = events.filter((event) =>
+        (event.status || "published") === "published"
+        && (event.is_public === true || (!supabaseClient && event.is_public == null))
+      ).filter((event) => {
         const matchesGenre = genreFilter.value === "all" || event.genre === genreFilter.value;
         const matchesDate = dateFilter.value === "all" || event.dateGroup === dateFilter.value;
         const matchesPlace = placeFilter.value === "all" || event.place === placeFilter.value;
@@ -1067,6 +1070,7 @@
     }
 
     function formatEventDate(isoDate) {
+      if (!isoDate) return "Datum offen";
       const date = new Date(isoDate);
       if (Number.isNaN(date.getTime())) return "";
       const today = new Date();
@@ -1079,6 +1083,7 @@
     }
 
     function getDateGroup(isoDate) {
+      if (!isoDate) return "all";
       const eventDate = new Date(isoDate);
       const today = new Date();
       const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
@@ -1129,6 +1134,7 @@
         art: record.art || record.title,
         description: record.description || "",
         is_public: record.is_public,
+        status: record.status || "published",
         sort_order: record.sort_order
       }));
       renderEvents();
@@ -1301,7 +1307,8 @@
       document.getElementById("eventTitle").value = record?.title || "";
       document.getElementById("eventType").value = record?.type || "";
       document.getElementById("eventGenre").value = record?.genre || "party";
-      document.getElementById("eventDate").value = toLocalDateTimeInput(record?.starts_at);
+      const eventDate = record?.starts_at || record?.start_datetime;
+      document.getElementById("eventDate").value = record && !eventDate ? "" : toLocalDateTimeInput(eventDate);
       document.getElementById("eventPlace").value = record?.place || "city";
       document.getElementById("eventVenue").value = record?.venue || "";
       document.getElementById("eventPrice").value = record?.price || "";
@@ -1434,20 +1441,37 @@
       importSummary.textContent = "KI-Import läuft…";
 
       try {
-        const { data, error } = await supabaseClient.rpc("runEventImport", {
-          p_city: "Erfurt",
-          p_dry_run: !!dryRunToggle.checked,
-          p_max_events: 25
-        });
-
-        if (error) {
-          importSummary.textContent = `Import fehlgeschlagen: ${error.message}`;
-          showToast(`Import fehlgeschlagen: ${error.message}`);
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        if (!accessToken) {
+          importSummary.textContent = "Import fehlgeschlagen: Keine gültige Session für den Admin-Import.";
+          showToast("Import fehlgeschlagen: Keine gültige Session.");
           return;
         }
 
-        const result = data || {};
-        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung.`;
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/run-event-import`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            city: "Erfurt",
+            dryRun: !!dryRunToggle.checked,
+            maxEvents: 25
+          })
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = result?.error || `HTTP ${response.status}`;
+          importSummary.textContent = `Import fehlgeschlagen: ${message}`;
+          showToast(`Import fehlgeschlagen: ${message}`);
+          return;
+        }
+
+        const errorCount = Array.isArray(result.errors) ? result.errors.length : 0;
+        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung, ${errorCount} Quellen-/Verarbeitungsfehler.`;
         showToast(`Import abgeschlossen: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert.`);
         await loadEventsFromSupabase();
         await loadAdminEvents();
