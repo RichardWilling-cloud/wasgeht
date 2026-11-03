@@ -174,8 +174,8 @@
     .art-disc::after { inset: 18%; }
     .disc-center { z-index: 1; width: 31%; aspect-ratio: 1; border-radius: 50%; background: var(--orange); display: grid; place-items: center; font-size: 28px; }
     .art-sticker { position: absolute; z-index: 2; top: 12%; right: 8%; width: 96px; height: 96px; display: grid; place-items: center; border-radius: 50%; background: var(--orange); color: white; font-size: 11px; font-weight: 800; line-height: 1.15; text-align: center; transform: rotate(12deg); }
-    .art-caption { position: absolute; z-index: 2; left: 64px; bottom: 60px; color: white; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 1px 5px rgba(55,45,75,.22); }
-    .art-caption span { color: var(--acid); }
+    .art-caption { position: absolute; z-index: 2; bottom: 60px; left: 50%; display: flex; width: max-content; max-width: calc(100% - 48px); flex-wrap: nowrap; align-items: center; justify-content: center; gap: .55em; transform: translateX(-50%); color: white; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 5px rgba(55,45,75,.35); }
+    .art-caption span { flex: 0 0 auto; color: var(--acid); font-size: 1.3em; line-height: 1; text-shadow: 0 0 10px rgba(201,217,154,.65); }
     .art-cross { position: absolute; top: 12%; left: 7%; color: var(--acid); font-size: 34px; font-weight: 200; }
 
     .events { padding: 42px 0 84px; }
@@ -621,6 +621,8 @@
       .hero-art { min-height: 280px; }
       .art-disc { width: 225px; }
       .art-sticker { width: 75px; height: 75px; font-size: 9px; }
+      .art-caption { bottom: 56px; font-size: 9px; letter-spacing: .1em; }
+      .art-cross { top: 10%; left: 6%; font-size: 30px; }
       .events { padding: 38px 0 60px; }
       .filters { padding: 10px; }
       .filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
@@ -660,7 +662,7 @@
     }
     @media (max-width: 640px) {
       .hero-art { border-radius: 30px; }
-      .art-caption { left: 40px; bottom: 42px; }
+      .art-caption { bottom: 56px; }
       .filters { border-radius: 22px; }
       .filter-row { gap: 8px; }
       .filter-label { padding-left: 4px; }
