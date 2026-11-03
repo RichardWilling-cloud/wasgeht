@@ -130,4 +130,4 @@ Lokale Variablen sind in `.env.example` dokumentiert. Diese Datei ist nur eine V
 
 Die Function speichert Events ohne belastbares Datum oder Ort nicht als veröffentlicht. Sie nutzt den angemeldeten Admin-JWT mit RLS, schützt Organizer-Events, protokolliert Quellenfehler und archiviert vergangene Events transaktional. Die SQL-Erweiterung plant zusätzlich eine tägliche Archivierung um 03:00 UTC mit `pg_cron`. Ein Dry-Run protokolliert den Lauf, verändert aber keine Events und archiviert nichts.
 
-Die serverseitige Implementierung lebt in [`supabase/functions/run-event-import/index.js`](./supabase/functions/run-event-import/index.js) und bildet den echten Admin-Import-Lauf ab; dort sind die modularen Quellenadapter, der Admin-Check und die Archivierung bereits integriert.
+Die serverseitige Implementierung lebt in [`supabase/functions/run-event-import/index.ts`](./supabase/functions/run-event-import/index.ts) und bildet den echten Admin-Import-Lauf ab; dort sind die modularen Quellenadapter, der Admin-Check und die Archivierung bereits integriert.

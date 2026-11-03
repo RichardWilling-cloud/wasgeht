@@ -1,3 +1,4 @@
+// Supabase CLI expects TypeScript entrypoints for Edge Functions.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
   || Deno.env.get("SUPABASE_ANON_KEY");
