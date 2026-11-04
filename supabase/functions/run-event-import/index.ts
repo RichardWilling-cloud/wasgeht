@@ -727,7 +727,7 @@ async function extractEvent(candidate, city, now) {
         },
         { role: "user", content: candidate.raw_text.slice(0, 8000) },
       ],
-      max_tokens: 700,
+      max_completion_tokens: 700,
     }),
   });
 
