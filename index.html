@@ -378,6 +378,7 @@
     .admin-event-name { min-width: 0; }
     .admin-event-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
     .admin-event-name span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .admin-event-name .admin-source-link { display: block; width: fit-content; max-width: 100%; overflow: hidden; color: var(--blue); text-overflow: ellipsis; white-space: nowrap; }
     .admin-event-actions { display: flex; align-items: center; gap: 6px; }
     .admin-event-actions button { min-height: 34px; padding: 7px 10px; border: 1px solid rgba(145,119,145,.22); border-radius: 999px; background: var(--dialog-glass); color: var(--ink); font-size: 10px; font-weight: 700; cursor: pointer; }
     .admin-event-actions button:hover { border-color: var(--blue); }
@@ -1271,6 +1272,7 @@
           <div class="admin-event-name">
             <strong>${escapeHTML(record.title)}</strong>
             <span>${record.is_public ? "Öffentlich" : "Privat"} · ${escapeHTML(record.venue)} · ${escapeHTML(formatEventDate(record.starts_at))}</span>
+            ${renderEventSource(record)}
           </div>
           <div class="admin-event-actions">
             <button type="button" data-admin-action="move-up" data-event-id="${escapeHTML(record.id)}" aria-label="Event nach oben verschieben" ${index === 0 ? "disabled" : ""}>↑</button>
@@ -1280,6 +1282,16 @@
             <button class="delete-event" type="button" data-admin-action="delete" data-event-id="${escapeHTML(record.id)}">Löschen</button>
           </div>
         </article>`).join("");
+    }
+
+    function renderEventSource(record) {
+      const sourceUrl = normalizeImageUrl(record.source_url);
+      let sourceName = String(record.source_name || "").trim();
+      if (!sourceName && sourceUrl) sourceName = new URL(sourceUrl).hostname;
+      if (!sourceName) return "";
+      return sourceUrl
+        ? `<a class="admin-source-link" href="${escapeHTML(sourceUrl)}" target="_blank" rel="noopener noreferrer">Quelle: ${escapeHTML(sourceName)} ↗</a>`
+        : `<span>Quelle: ${escapeHTML(sourceName)}</span>`;
     }
 
     async function loadAdminEvents() {
@@ -1311,6 +1323,7 @@
           <div class="admin-event-name">
             <strong>${escapeHTML(record.title)}</strong>
             <span>${escapeHTML(record.source_type || "manual")} · ${escapeHTML(record.city || "Erfurt")} · ${escapeHTML(formatEventDate(record.start_datetime || record.starts_at))}</span>
+            ${renderEventSource(record)}
           </div>
           <div class="admin-event-actions">
             <button type="button" data-review-action="approve" data-event-id="${escapeHTML(record.id)}">Freigeben</button>
@@ -1573,6 +1586,7 @@
         const errorDetails = (result.errors || [])
           .map((item) => `${item.source || "Import"}: ${item.message}`)
           .join(" · ");
+        const warningDetails = (result.warnings || []).join(" · ");
         const nextOffset = Number(result.next_batch_offset) || 0;
         const totalCandidates = Number(result.total_candidates) || 0;
         if (nextOffset > batchOffset) importRetriesWithoutProgress = 0;
@@ -1587,7 +1601,7 @@
           console.warn("Could not save the event import batch position:", error);
         }
         const stoppedAtRateLimit = result.has_more && nextOffset === batchOffset && importRetriesWithoutProgress >= 3;
-        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung, ${errorCount} Quellen-/Verarbeitungsfehler.${batchSummary}${result.has_more && !stoppedAtRateLimit ? " Der nächste Teil startet automatisch; Tab geöffnet lassen." : stoppedAtRateLimit ? " Wegen wiederholtem API-Limit pausiert; später erneut starten." : ""}${errorDetails ? ` ${errorDetails}` : ""}`;
+        importSummary.textContent = `Ergebnis: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.unchanged ?? 0} unverändert, ${result.archived ?? 0} archiviert, ${result.needs_review ?? 0} zur Prüfung, ${errorCount} Quellen-/Verarbeitungsfehler.${batchSummary}${result.has_more && !stoppedAtRateLimit ? " Der nächste Teil startet automatisch; Tab geöffnet lassen." : stoppedAtRateLimit ? " Wegen wiederholtem API-Limit pausiert; später erneut starten." : ""}${warningDetails ? ` Hinweis: ${warningDetails}` : ""}${errorDetails ? ` ${errorDetails}` : ""}`;
         showToast(`Import abgeschlossen: ${result.new ?? 0} neu, ${result.updated ?? 0} aktualisiert.`);
         await loadEventsFromSupabase();
         await loadAdminEvents();
@@ -1718,7 +1732,7 @@
       const chosen = visibleEvents[Math.floor(Math.random() * visibleEvents.length)];
       chosen.scrollIntoView({ behavior: "smooth", block: "center" });
       chosen.animate([{ transform: "scale(1)" }, { transform: "scale(1.035)" }, { transform: "scale(1)" }], { duration: 550 });
-      showToast(`Dein Zufallstipp: ${chosen.querySelector("h3").textContent} ✳`);
+      showToast(`Dein Zufallstipp: ${chosen.querySelector("h3").textContent}`);
     });
     document.getElementById("addEventButton").addEventListener("click", () => {
       if (signedInRole === "admin") openEventEditor();

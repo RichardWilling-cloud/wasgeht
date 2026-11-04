@@ -171,6 +171,7 @@ alter table public.events
   add column if not exists location_name text,
   add column if not exists address text,
   add column if not exists source_url text,
+  add column if not exists source_name text,
   add column if not exists source_type text not null default 'manual' check (source_type in ('instagram', 'google', 'website', 'manual')),
   add column if not exists image_url text,
   add column if not exists origin text not null default 'organizer' check (origin in ('ai', 'organizer')),
@@ -185,6 +186,9 @@ create table if not exists public.events_archive (
   archived_at timestamptz not null default now(),
   archive_reason text not null default 'past_event'
 );
+
+alter table public.events_archive
+  add column if not exists source_name text;
 
 create table if not exists public.sources (
   id uuid primary key default gen_random_uuid(),
@@ -312,14 +316,14 @@ begin
       id, title, type, genre, starts_at, date_group, place, venue, price, poster,
       art, description, is_public, sort_order, created_at, category, tags,
       start_datetime, end_datetime, city, location_name, address, source_url,
-      source_type, image_url, origin, content_hash, confidence, status, updated_at,
+      source_name, source_type, image_url, origin, content_hash, confidence, status, updated_at,
       last_seen_at, archived_at, archive_reason
     )
     select
       e.id, e.title, e.type, e.genre, e.starts_at, e.date_group, e.place, e.venue,
       e.price, e.poster, e.art, e.description, e.is_public, e.sort_order, e.created_at,
       e.category, e.tags, e.start_datetime, e.end_datetime, e.city, e.location_name,
-      e.address, e.source_url, e.source_type, e.image_url, e.origin, e.content_hash,
+      e.address, e.source_url, e.source_name, e.source_type, e.image_url, e.origin, e.content_hash,
       e.confidence, e.status, e.updated_at, e.last_seen_at, now(), 'past_event'
     from public.events e
     join expired x on x.id = e.id
