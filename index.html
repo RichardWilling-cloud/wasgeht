@@ -846,6 +846,7 @@
       </div>
       <button class="surprise" id="runImportButton" type="button">KI-Import starten</button>
       <button class="submit-link" id="pauseImportButton" type="button" hidden>Nach diesem Teil pausieren</button>
+      <button class="submit-link" id="resetImportProgressButton" type="button">Importfortschritt zurücksetzen</button>
       <p class="dialog-message" id="importSummary" role="status" aria-live="polite">Noch kein Import-Lauf.</p>
       <div class="admin-event-list" id="reviewQueueList" aria-live="polite" style="margin-top: 12px;"></div>
     </div>
@@ -949,6 +950,7 @@
     const dryRunToggle = document.getElementById("dryRunToggle");
     const runImportButton = document.getElementById("runImportButton");
     const pauseImportButton = document.getElementById("pauseImportButton");
+    const resetImportProgressButton = document.getElementById("resetImportProgressButton");
     let pauseImportAfterBatch = false;
     let continueImportAutomatically = false;
     let importRetriesWithoutProgress = 0;
@@ -1537,6 +1539,7 @@
         importRetriesWithoutProgress = 0;
       }
       runImportButton.disabled = true;
+      resetImportProgressButton.disabled = true;
       runImportButton.textContent = "Import läuft…";
       pauseImportButton.hidden = false;
       pauseImportButton.disabled = false;
@@ -1624,6 +1627,7 @@
             if (pauseImportAfterBatch) {
               importSummary.textContent += " Import pausiert. Erneut starten setzt beim nächsten Teil fort.";
               runImportButton.disabled = false;
+              resetImportProgressButton.disabled = false;
               runImportButton.textContent = "KI-Import starten";
               pauseImportButton.hidden = true;
               return;
@@ -1632,6 +1636,7 @@
           })();
         } else {
           runImportButton.disabled = false;
+          resetImportProgressButton.disabled = false;
           runImportButton.textContent = "KI-Import starten";
           pauseImportButton.hidden = true;
         }
@@ -1694,6 +1699,25 @@
     });
     document.getElementById("createEventButton").addEventListener("click", () => openEventEditor());
     runImportButton.addEventListener("click", () => void runImport());
+    resetImportProgressButton.addEventListener("click", () => {
+      if (runImportButton.disabled) {
+        showToast("Bitte den Import zuerst pausieren und den laufenden Batch beenden lassen.");
+        return;
+      }
+      if (!confirm("Den gespeicherten Fortschritt für Testlauf und echten Import zurücksetzen? Der nächste Lauf beginnt wieder bei Event 1.")) {
+        return;
+      }
+      try {
+        localStorage.removeItem("wasgeht-import-offset-live");
+        localStorage.removeItem("wasgeht-import-offset-dry-run");
+        importRetriesWithoutProgress = 0;
+        importSummary.textContent = "Importfortschritt zurückgesetzt. Testlauf und echter Import beginnen beim nächsten Start wieder am Anfang.";
+        showToast("Importfortschritt wurde zurückgesetzt.");
+      } catch (error) {
+        importSummary.textContent = `Importfortschritt konnte nicht zurückgesetzt werden: ${error.message}`;
+        showToast(`Importfortschritt konnte nicht zurückgesetzt werden: ${error.message}`);
+      }
+    });
     pauseImportButton.addEventListener("click", () => {
       pauseImportAfterBatch = true;
       pauseImportButton.disabled = true;

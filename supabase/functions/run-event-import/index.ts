@@ -130,7 +130,7 @@ function isEventCard(tagName, attributes) {
   return !/\b(events|event-list|event-calendar|event-container|event-wrapper|accordion-list)\b/i.test(classes);
 }
 
-function extractEventCardBlocks(html) {
+function extractHtmlBlocks(html, shouldIncludeElement) {
   const blocks = [];
   const stack = [];
   const tokenRegex = /<!--[\s\S]*?-->|<\/?([a-z][\w:-]*)\b[^>]*>/gi;
@@ -150,7 +150,14 @@ function extractEventCardBlocks(html) {
       const element = stack[index];
       stack.length = index;
       if (element.isCandidate) {
-        blocks.push({ html: sourceHtml.slice(element.start, tokenRegex.lastIndex), depth: index });
+        blocks.push({
+          html: sourceHtml.slice(element.start, tokenRegex.lastIndex),
+          start: element.start,
+          end: tokenRegex.lastIndex,
+          sourceHtml,
+          attributes: element.attributes,
+          depth: index,
+        });
       }
       continue;
     }
@@ -160,15 +167,112 @@ function extractEventCardBlocks(html) {
     const element = {
       tagName,
       start: token.index,
-      isCandidate: isEventCard(tagName, attributes),
+      attributes,
+      isCandidate: shouldIncludeElement(tagName, attributes),
     };
     if (!selfClosing) stack.push(element);
-    else if (element.isCandidate) blocks.push({ html: token[0], depth: stack.length });
+    else if (element.isCandidate) {
+      blocks.push({
+        html: token[0],
+        start: token.index,
+        end: tokenRegex.lastIndex,
+        sourceHtml,
+        attributes,
+        depth: stack.length,
+      });
+    }
   }
 
   return blocks.sort((a, b) => a.depth - b.depth);
 }
 
+function extractEventCardBlocks(html) {
+  return extractHtmlBlocks(html, isEventCard);
+}
+
+function attributeValue(attributes, name) {
+  return attributes.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"))?.slice(1).find(Boolean) || "";
+}
+
+function dateTimeFromDayMonth(day, month, timeText, now = new Date()) {
+  const berlinParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type) => berlinParts.find((item) => item.type === type)?.value;
+  const year = Number(part("year"));
+  const currentDate = Date.UTC(year, Number(part("month")) - 1, Number(part("day")));
+  const eventDate = Date.UTC(year, month - 1, day);
+  if (!Number.isFinite(eventDate) || eventDate < currentDate) return null;
+  return dateTimeInBerlin(
+    `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}.${year}`,
+    timeText,
+  );
+}
+
+function nextRecurringDate(text, now = new Date()) {
+  const normalized = normalizeText(text);
+  const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/) ||
+    text.match(/\b([01]?\d|2[0-3])\s*uhr\b/i);
+  const time = timeMatch ? `${String(Number(timeMatch[1])).padStart(2, "0")}:${timeMatch[2] || "00"}` : "19:00";
+  const berlinParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type) => Number(berlinParts.find((item) => item.type === type)?.value);
+  const year = part("year");
+  const month = part("month");
+  const day = part("day");
+  const currentDate = Date.UTC(year, month - 1, day);
+  const monthDay = normalized.match(/\b(?:jeden|jeder|jedes)\s+(\d{1,2})\s+des monats\b/);
+  if (monthDay) {
+    const targetDay = Number(monthDay[1]);
+    for (let monthOffset = 0; monthOffset < 13; monthOffset += 1) {
+      const monthDate = new Date(Date.UTC(year, month - 1 + monthOffset, 1));
+      const targetYear = monthDate.getUTCFullYear();
+      const targetMonth = monthDate.getUTCMonth() + 1;
+      const lastDay = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+      if (targetDay > lastDay) continue;
+      const targetDate = Date.UTC(targetYear, targetMonth - 1, targetDay);
+      if (targetDate >= currentDate) {
+        return dateTimeInBerlin(
+          `${String(targetDay).padStart(2, "0")}.${String(targetMonth).padStart(2, "0")}.${targetYear}`,
+          time,
+        );
+      }
+    }
+  }
+
+  const weekdays = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"];
+  const recurringWeekday = normalized.match(
+    /\b(?:jeden|jede|jedes|immer)\s+(sonntag|montag|dienstag|mittwoch|donnerstag|freitag|samstag)\b/
+  );
+  const weekday = recurringWeekday ? weekdays.indexOf(recurringWeekday[1]) : -1;
+  if (weekday < 0) return null;
+  const currentWeekday = new Date(currentDate).getUTCDay();
+  let daysUntil = (weekday - currentWeekday + 7) % 7;
+  if (daysUntil === 0) {
+    const timeParts = time.split(":").map(Number);
+    const nowInBerlin = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(now);
+    const currentHour = Number(nowInBerlin.find((item) => item.type === "hour")?.value);
+    const currentMinute = Number(nowInBerlin.find((item) => item.type === "minute")?.value);
+    if (timeParts[0] * 60 + timeParts[1] <= currentHour * 60 + currentMinute) daysUntil = 7;
+  }
+  const targetDate = new Date(currentDate + daysUntil * 86_400_000);
+  return dateTimeInBerlin(
+    `${String(targetDate.getUTCDate()).padStart(2, "0")}.${String(targetDate.getUTCMonth() + 1).padStart(2, "0")}.${targetDate.getUTCFullYear()}`,
+    time,
+  );
+}
 function absoluteImageUrl(value, baseUrl) {
   if (Array.isArray(value)) return absoluteImageUrl(value.find(Boolean), baseUrl);
   if (value && typeof value === "object") {
@@ -468,6 +572,174 @@ function jazzClubCandidates(html, source) {
   return candidates.slice(0, 25);
 }
 
+function franzMehlhoseCandidates(html, source, now = new Date()) {
+  const candidates = [];
+  const buttons = [...html.matchAll(/<button\b[^>]*class=["'][^"']*\baccordion\b[^"']*["'][^>]*>([\s\S]*?)<\/button>/gi)];
+  for (let index = 0; index < buttons.length; index += 1) {
+    const [button, buttonContent] = buttons[index];
+    const title = cleanHtml(buttonContent.match(/<span\b[^>]*class=["'][^"']*\bevent_title\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i)?.[1] || "");
+    const dateText = cleanHtml(buttonContent).match(/\b(\d{1,2})\.(\d{1,2})\b/);
+    if (!title || !dateText) continue;
+
+    const start = buttons[index].index + button.length;
+    const end = buttons[index + 1]?.index ?? html.length;
+    const detailsHtml = html.slice(start, end);
+    const details = htmlText(detailsHtml);
+    const time = details.match(/\b(?:beginn|start)\s*:?\s*(\d{1,2})(?::(\d{2}))?\s*uhr\b/i) ||
+      details.match(/\b(?:beginn|start)\s*:?\s*(\d{1,2}):(\d{2})\b/i);
+    const startDate = dateTimeFromDayMonth(
+      Number(dateText[1]),
+      Number(dateText[2]),
+      time ? `${String(Number(time[1])).padStart(2, "0")}:${time[2] || "00"}` : "20:00",
+      now,
+    );
+    if (!startDate) continue;
+    const date = new Date(startDate);
+    candidates.push({
+      raw_text: `${title}\n${String(date.getUTCDate()).padStart(2, "0")}.${String(date.getUTCMonth() + 1).padStart(2, "0")}.${date.getUTCFullYear()}\n${details}`
+        .slice(0, 5000),
+      title,
+      description: details || null,
+      start_datetime: startDate,
+      end_datetime: null,
+      city: "Erfurt",
+      location_name: "Franz Mehlhose",
+      address: null,
+      source_url: `${new URL(source.url).origin}/#event-${date.toISOString().slice(0, 10)}`,
+      image_url: imageFromEventCard(detailsHtml, source.url),
+      source_type: "website",
+      source_name: source.source_name,
+    });
+  }
+  return candidates.slice(0, 25);
+}
+
+function jederkannCandidates(html, source, now = new Date()) {
+  const blocks = extractHtmlBlocks(html, (tagName, attributes) =>
+    tagName === "div" && /\bblock-textfeld\b/i.test(attributes)
+  ).filter((block, index, all) =>
+    !all.some((outer, outerIndex) =>
+      outerIndex !== index && outer.start <= block.start && outer.end >= block.end
+    )
+  );
+  const candidates = [];
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    const paragraphs = [...block.html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)];
+    const title = cleanHtml(
+      block.html.match(/<(?:strong|b)\b[^>]*>([\s\S]*?)<\/(?:strong|b)>/i)?.[1] ||
+      paragraphs[0]?.[1] ||
+      "",
+    );
+    const details = paragraphs.slice(1).map((match) => cleanHtml(match[1])).filter(Boolean).join("\n");
+    const allText = htmlText(block.html);
+    const startDate = nextRecurringDate(`${allText}\n${details}`, now);
+    if (!title || !startDate) continue;
+    const nextBlockStart = blocks[index + 1]?.start ?? block.sourceHtml.length;
+    const adjacentHtml = block.sourceHtml.slice(block.end, nextBlockStart);
+    const anchor = attributeValue(block.attributes, "data-anker") || attributeValue(block.attributes, "id");
+    const parsedDate = new Date(startDate);
+    const dateFragment = parsedDate.toISOString().slice(0, 10);
+    candidates.push({
+      raw_text: `${title}\n${allText}\nNächster Termin: ${dateFragment} ${startDate.slice(11, 16)} Europe/Berlin\nJederkann, Erfurt`
+        .slice(0, 5000),
+      title,
+      description: details || null,
+      start_datetime: startDate,
+      end_datetime: null,
+      city: "Erfurt",
+      location_name: "Jederkann",
+      address: null,
+      source_url: anchor
+        ? new URL(anchor.startsWith("#") ? anchor : `#${anchor}`, source.url).toString()
+        : source.url,
+      image_url: imageFromEventCard(adjacentHtml, source.url) || imageFromEventCard(block.html, source.url),
+      source_type: "website",
+      source_name: source.source_name,
+    });
+  }
+  return candidates.slice(0, 25);
+}
+
+function frauKorteCandidates(html, source, now = new Date()) {
+  const headings = [...html.matchAll(/<h2\b(?=[^>]*\bclass=["'][^"']*\btextheading2\b[^"']*["'])[^>]*>([\s\S]*?)<\/h2>/gi)]
+    .map((match) => ({
+      index: match.index,
+      end: match.index + match[0].length,
+      titleText: cleanHtml(match[1]),
+    }))
+    .filter((heading) => /^\d{1,2}\/\d{1,2}\s+\S/.test(heading.titleText));
+  const candidates = [];
+  for (let index = 0; index < headings.length; index += 1) {
+    const heading = headings[index];
+    const match = heading.titleText.match(/^(\d{1,2})\/(\d{1,2})\s+(.+)$/);
+    if (!match) continue;
+    const [, dayText, monthText, title] = match;
+    const nextHeadingStart = headings[index + 1]?.index ?? html.length;
+    const content = html.slice(heading.end, nextHeadingStart);
+    const details = htmlText(content);
+    const time = details.match(/\b(?:start|beginn)\s*:?\s*(\d{1,2})(?::(\d{2}))?\s*uhr\b/i) ||
+      details.match(/\b(?:start|beginn)\s*:?\s*(\d{1,2}):(\d{2})\b/i);
+    const startDate = dateTimeFromDayMonth(
+      Number(dayText),
+      Number(monthText),
+      time ? `${String(Number(time[1])).padStart(2, "0")}:${time[2] || "00"}` : "20:00",
+      now,
+    );
+    if (!startDate) continue;
+    const date = new Date(startDate);
+    candidates.push({
+      raw_text: `${title}\n${String(date.getUTCDate()).padStart(2, "0")}.${String(date.getUTCMonth() + 1).padStart(2, "0")}.${date.getUTCFullYear()}\n${details}`
+        .slice(0, 5000),
+      title,
+      description: details || null,
+      start_datetime: startDate,
+      end_datetime: null,
+      city: "Erfurt",
+      location_name: "Frau Korte",
+      address: null,
+      source_url: `${new URL(source.url).origin}/#event-${startDate.slice(0, 10)}`,
+      image_url: imageFromEventCard(content, source.url),
+      source_type: "website",
+      source_name: source.source_name,
+    });
+  }
+  return candidates.slice(0, 25);
+}
+
+function retronomCandidates(html, source, now = new Date()) {
+  const upcomingSection = html.match(/kommende veranstaltungen([\s\S]*?)(?:vergangene veranstaltungen|$)/i)?.[1] || "";
+  const cards = extractHtmlBlocks(upcomingSection, (tagName, attributes) =>
+    tagName === "article" && /\bpost-card\b/i.test(attributes)
+  );
+  const candidates = [];
+  for (const block of cards) {
+    const link = block.html.match(/<a\b[^>]*href=["']([^"']*\/events\/[^"']*)["']/i)?.[1];
+    const title = cleanHtml(block.html.match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1] || "");
+    const text = htmlText(block.html);
+    const startDate = nextRecurringDate(text, now);
+    if (!title || !startDate) continue;
+    const start = new Date(startDate);
+    const eventUrl = link ? new URL(link.replace(/&amp;/g, "&"), source.url).toString() : source.url;
+    candidates.push({
+      raw_text: `${title}\n${text}\nNächster Termin: ${start.toISOString().slice(0, 10)} ${startDate.slice(11, 16)} Europe/Berlin`
+        .slice(0, 5000),
+      title,
+      description: text.replace(title, "").trim() || null,
+      start_datetime: startDate,
+      end_datetime: null,
+      city: "Erfurt",
+      location_name: "Retronom",
+      address: null,
+      source_url: eventUrl,
+      image_url: imageFromEventCard(block.html, source.url),
+      source_type: "website",
+      source_name: source.source_name,
+    });
+  }
+  return candidates.slice(0, 25);
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -625,6 +897,14 @@ async function fetchWebsiteCandidates(source) {
     candidates = triebwerkCandidates(html, source);
   } else if (url.hostname === "www.jazzclub-erfurt.de" || url.hostname === "jazzclub-erfurt.de") {
     candidates = jazzClubCandidates(html, source);
+  } else if (url.hostname.endsWith("franz-mehlhose.de")) {
+    candidates = franzMehlhoseCandidates(html, source);
+  } else if (url.hostname.endsWith("jederkann.online")) {
+    candidates = jederkannCandidates(html, source);
+  } else if (url.hostname.endsWith("fraukorte.de")) {
+    candidates = frauKorteCandidates(html, source);
+  } else if (url.hostname.endsWith("retronom.net")) {
+    candidates = retronomCandidates(html, source);
   } else if (url.hostname === "cafe-kunst-bar.com" && /<ul\b[^>]*class=["'][^"']*\bevents\b[^"']*\bdiary\b[^"']*\bfuture\b/i.test(html)) {
     candidates = structuredEventsFromHtml(html, source);
     if (!candidates.length) return [];
