@@ -825,11 +825,13 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
 }
 
 async function supabaseRequest(path, accessToken, options = {}) {
+  const token = accessToken?.replace(/^Bearer\s+/i, "");
+  const isJwt = token?.split(".").length === 3;
   const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
     headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: accessToken,
+      apikey: isJwt ? SUPABASE_KEY : token || SUPABASE_KEY,
+      ...(isJwt ? { Authorization: `Bearer ${token}` } : {}),
       "Content-Type": "application/json",
       ...options.headers,
     },
