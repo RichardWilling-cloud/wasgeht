@@ -1221,7 +1221,7 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
 
   try {
     const { data: sources } = await supabaseRequest(
-      `sources?select=id,city,source_type,source_name,url,query_text,is_active&city=eq.${encodeURIComponent(city)}&is_active=is.true`,
+      `sources?select=id,city,source_type,source_name,url,query_text,is_active&city=eq.${encodeURIComponent(city)}&source_type=eq.website&is_active=is.true`,
       accessToken,
     );
     const candidateBatches = await Promise.all((sources || []).map(async (source) => {
