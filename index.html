@@ -75,6 +75,7 @@
       height: max(105vw, 900px);
       border-radius: 50%;
       filter: blur(34px) saturate(190%);
+      contain: strict;
       will-change: transform;
     }
     .ambient-orb--rose {
@@ -116,6 +117,16 @@
       mix-blend-mode: overlay;
       opacity: .42;
     }
+    html.performance-lite .ambient-orb {
+      filter: blur(18px) saturate(135%);
+      animation-duration: 30s;
+    }
+    html.performance-lite .ambient-bg::after {
+      display: none;
+    }
+    html.performance-lite .ambient-orb {
+      mix-blend-mode: normal;
+    }
     button, input, select { font: inherit; }
     button { color: inherit; cursor: pointer; }
     a { color: inherit; text-decoration: none; }
@@ -148,13 +159,32 @@
     .site-version::before { width: 5px; height: 5px; border-radius: 50%; background: currentColor; content: ""; opacity: .65; }
     .live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #e44332; }
     .nav { min-height: 78px; border-bottom: 1px solid var(--line); }
-    .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 23px; font-weight: 900; letter-spacing: -.08em; }
-    .brand-mark { width: 24px; height: 24px; display: inline-grid; place-items: center; background: var(--acid); border-radius: 50%; font-size: 13px; letter-spacing: 0; transform: rotate(-15deg); }
+    .brand { display: inline-flex; align-items: center; gap: 9px; font-size: 19px; font-weight: 850; letter-spacing: -.075em; }
+    .brand-mark {
+      width: 132px;
+      height: 52px;
+      display: block;
+      flex: 0 0 auto;
+      background: linear-gradient(112deg, #5c6266 0%, #aeb3b4 16%, #f0eee8 30%, #737a7e 47%, #d2d1ca 61%, #8f9699 78%, #4f565a 100%);
+      mask: url("wasgeht-ab-logo.svg") center / contain no-repeat;
+      -webkit-mask: url("wasgeht-ab-logo.svg") center / contain no-repeat;
+    }
     .nav-links { gap: 34px; margin-left: 70px; margin-right: auto; font-size: 13px; font-weight: 700; }
     .nav-links a:hover, .footer-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
     .nav-actions { gap: 20px; font-size: 12px; font-weight: 700; }
     .city-select { border: 0; background: transparent; padding: 8px 0; font-weight: 700; }
     .submit-link { border-bottom: 1px solid var(--ink); padding: 8px 0; }
+    .theme-toggle,
+    .account-button,
+    .logout-button {
+      min-height: 40px;
+    }
+    .account-button,
+    .logout-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
     .menu-button { display: none; border: 0; background: transparent; font-size: 24px; }
 
     .hero { display: grid; grid-template-columns: 1.05fr .95fr; min-height: 530px; padding: 54px 0 42px; border-bottom: 1px solid var(--line); }
@@ -304,12 +334,7 @@
     .topline { border: 0; }
     .live-dot { background: linear-gradient(135deg, #ff8068, #ffb064); box-shadow: 0 0 14px rgba(255,128,104,.65); }
     .nav { border: 0; }
-    .brand-mark {
-      background: linear-gradient(145deg, rgba(255,255,255,.92), rgba(217,255,103,.72));
-      border: 1px solid rgba(255,255,255,.82);
-      box-shadow: inset 0 1px 5px rgba(255,255,255,.9), 0 5px 18px rgba(110,135,74,.16);
-      backdrop-filter: blur(14px);
-    }
+    .brand-mark { filter: drop-shadow(0 7px 22px rgba(40,34,43,.32)) drop-shadow(0 2px 8px rgba(255,255,255,.18)); }
     .nav-links a, .footer-links a { transition: color .3s ease, opacity .3s ease; }
     .nav-links a:hover, .footer-links a:hover { color: var(--blue); text-decoration: none; }
     .city-select, .menu-button { border-radius: 999px; }
@@ -505,6 +530,60 @@
     .scroll-reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
     .scroll-reveal.is-visible { opacity: 1; transform: translateY(0); }
     .event-card.scroll-reveal.is-visible:hover { transform: translateY(-6px); }
+    html.performance-lite .hero-art {
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+    html.performance-lite .hero-art .art-disc,
+    html.performance-lite .hero-art .art-sticker,
+    html.performance-lite .hero-art .art-cross,
+    html.performance-lite .hero-art::before,
+    html.performance-lite .hero-art::after {
+      transition: none;
+    }
+    html.performance-lite .submit-link,
+    html.performance-lite .theme-toggle,
+    html.performance-lite .app-dialog,
+    html.performance-lite .art-disc,
+    html.performance-lite .art-sticker,
+    html.performance-lite .filters,
+    html.performance-lite .filter-control,
+    html.performance-lite .search-control,
+    html.performance-lite .surprise,
+    html.performance-lite .event-card,
+    html.performance-lite .footer,
+    html.performance-lite .toast {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    html.performance-lite .app-dialog::backdrop {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    html.performance-lite .submit-link,
+    html.performance-lite .theme-toggle,
+    html.performance-lite .filter-control,
+    html.performance-lite .search-control {
+      background: rgba(255,255,255,.55);
+    }
+    html.performance-lite .filters,
+    html.performance-lite .event-card {
+      background: rgba(255,255,255,.72);
+    }
+    html.performance-lite[data-theme="dark"] .submit-link,
+    html.performance-lite[data-theme="dark"] .theme-toggle,
+    html.performance-lite[data-theme="dark"] .filter-control,
+    html.performance-lite[data-theme="dark"] .search-control {
+      background: rgba(55,51,57,.9);
+    }
+    html.performance-lite[data-theme="dark"] .filters,
+    html.performance-lite[data-theme="dark"] .event-card {
+      background: rgba(55,51,57,.88);
+    }
+    html.performance-lite .event-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--event-shadow);
+    }
     .event-poster { margin: 7px 7px 0; border-radius: 20px; }
     .poster-label, .poster-date { border-radius: 999px; box-shadow: 0 4px 15px rgba(30,34,63,.1); }
     .poster-1 { background: radial-gradient(circle at 25% 15%, #ffc0a8, transparent 42%), linear-gradient(145deg, #f47e55, #e86389); }
@@ -518,7 +597,8 @@
     .event-info { padding: 16px; }
     .event-bottom { border-color: rgba(112,115,131,.14); }
     .footer { margin-top: 40px; border-top-color: rgba(255,255,255,.35); background: var(--footer-glass); color: var(--ink); backdrop-filter: blur(22px); }
-    .footer .brand-mark { color: var(--ink); }
+    .footer .brand { font-size: 0; }
+    .footer .brand-mark { width: 118px; height: 46px; }
     .footer-links { color: #55596d; }
     .copyright { color: #73778a; }
     .toast {
@@ -571,6 +651,10 @@
       --theme-toggle-shadow: 0 5px 18px rgba(12,10,14,.2), inset 0 1px 0 rgba(255,239,231,.14);
     }
     html[data-theme="dark"] body { color: var(--ink); }
+    html[data-theme="dark"] .brand-mark {
+      background: linear-gradient(112deg, #d9d8d1 0%, #aeb4b6 16%, #fffdf5 30%, #8f979b 47%, #e4e1d8 61%, #b8bec0 78%, #d1d0ca 100%);
+      filter: drop-shadow(0 8px 24px rgba(8,7,10,.58)) drop-shadow(0 2px 9px rgba(255,247,233,.16));
+    }
     html[data-theme="dark"] .ambient-orb { filter: blur(42px) saturate(160%); mix-blend-mode: screen; }
     html[data-theme="dark"] .ambient-orb--rose { opacity: .94; }
     html[data-theme="dark"] .ambient-orb--lilac { opacity: .88; }
@@ -631,9 +715,33 @@
       .nav { min-height: 65px; }
       .nav-links, a.submit-link { display: none; }
       .menu-button { display: block; }
+      .nav.menu-open { position: relative; }
+      .nav.menu-open .nav-links {
+        position: absolute;
+        z-index: 5;
+        top: calc(100% - 1px);
+        right: 0;
+        display: grid;
+        gap: 0;
+        width: min(250px, calc(100vw - 34px));
+        margin: 0;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--filter-glass);
+        box-shadow: 0 18px 40px rgba(48,35,57,.18);
+        backdrop-filter: blur(18px);
+      }
+      .nav.menu-open .nav-links a {
+        padding: 13px 14px;
+        border-radius: 13px;
+      }
+      .nav.menu-open .nav-links a:hover {
+        background: var(--control-active);
+      }
       .nav-actions { gap: 8px; }
       .city-select { display: none; }
-      .account-button, .logout-button { padding: 8px 10px; font-size: 10px; }
+      .account-button, .logout-button { height: 40px; padding: 8px 10px; font-size: 10px; }
       .admin-button { width: auto; height: auto; padding: 8px 10px; font-size: 10px; }
       .city-select { font-size: 11px; }
       .hero { grid-template-columns: 1fr; padding: 42px 0 26px; gap: 34px; }
@@ -696,8 +804,8 @@
       .filter-actions .search-button { min-width: 0; width: auto; }
     }
     @media (max-width: 360px) {
-      .nav .brand { gap: 7px; font-size: 19px; }
-      .nav .brand-mark { width: 21px; height: 21px; }
+      .nav .brand { gap: 7px; font-size: 17px; }
+      .nav .brand-mark { width: 96px; height: 38px; }
       .nav .city-select { display: none; }
       .nav .nav-actions { gap: 6px; }
       .nav .theme-toggle { width: 36px; height: 36px; }
@@ -722,8 +830,8 @@
     </div>
   </div>
   <header class="wrap nav">
-    <a class="brand" href="#" aria-label="wasgeht Startseite"><span class="brand-mark">w</span>wasgeht</a>
-    <nav class="nav-links" aria-label="Hauptnavigation">
+    <a class="brand" href="#" aria-label="wasgeht Startseite"><span class="brand-mark" role="img" aria-label="wasgeht-ab.de"></span></a>
+    <nav class="nav-links" id="mainNavigation" aria-label="Hauptnavigation">
       <a href="#events">Events entdecken</a>
       <a href="#veranstalter">Für Veranstalter</a>
     </nav>
@@ -741,7 +849,7 @@
       <button class="theme-toggle admin-button" id="adminButton" type="button" hidden>Events verwalten</button>
       <button class="submit-link logout-button" id="logoutButton" type="button" hidden>Abmelden</button>
       <a class="submit-link" href="#veranstalter">Event eintragen ↗</a>
-      <button class="menu-button" aria-label="Menü öffnen">☰</button>
+      <button class="menu-button" id="menuButton" type="button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="mainNavigation">☰</button>
     </div>
   </header>
 
@@ -831,8 +939,8 @@
 
   <footer class="footer">
     <div class="wrap footer-main">
-      <a class="brand" href="#"><span class="brand-mark">w</span>wasgeht</a>
-      <div class="footer-links"><a href="#events">Events entdecken</a><a href="#veranstalter">Event eintragen</a><a href="mailto:hallo@wasgeht.de">Kontakt</a><a href="#">Instagram ↗</a></div>
+      <a class="brand" href="#" aria-label="wasgeht Startseite"><span class="brand-mark" role="img" aria-label="wasgeht-ab.de"></span></a>
+      <div class="footer-links"><a href="#events">Events entdecken</a><a href="#veranstalter">Event eintragen</a><a href="mailto:hallo@wasgeht.de">Kontakt</a></div>
       <span class="copyright">© 2026 wasgeht · Erfurt, Thüringen</span>
     </div>
   </footer>
@@ -910,6 +1018,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
+    const userAgent = navigator.userAgent || "";
+    const platform = navigator.userAgentData?.platform || navigator.platform || "";
+    const performanceLite = /Windows/i.test(`${userAgent} ${platform}`) || /Firefox/i.test(userAgent);
+    document.documentElement.classList.toggle("performance-lite", performanceLite);
+
     async function loadSiteVersion() {
       const versionLabel = document.getElementById("siteVersionLabel");
       try {
@@ -958,6 +1071,9 @@
     const placeFilter = document.getElementById("placeFilter");
     const toast = document.getElementById("toast");
     const themeToggle = document.getElementById("themeToggle");
+    const menuButton = document.getElementById("menuButton");
+    const mainNavigation = document.getElementById("mainNavigation");
+    const mainNav = document.querySelector(".nav");
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     const heroArt = document.querySelector(".hero-art");
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -993,7 +1109,7 @@
       });
     }
 
-    if (!reduceMotion && window.matchMedia("(pointer: fine)").matches) {
+    if (!performanceLite && !reduceMotion && window.matchMedia("(pointer: fine)").matches) {
       let pointerFrame = 0;
       heroArt.addEventListener("pointermove", (event) => {
         const bounds = heroArt.getBoundingClientRect();
@@ -1725,6 +1841,23 @@
     }
 
     document.getElementById("accountButton").addEventListener("click", openAuthDialog);
+    menuButton.addEventListener("click", () => {
+      const isOpen = mainNav.classList.toggle("menu-open");
+      menuButton.setAttribute("aria-expanded", String(isOpen));
+      menuButton.setAttribute("aria-label", isOpen ? "Menü schließen" : "Menü öffnen");
+    });
+    mainNavigation.addEventListener("click", (event) => {
+      if (!event.target.closest("a")) return;
+      mainNav.classList.remove("menu-open");
+      menuButton.setAttribute("aria-expanded", "false");
+      menuButton.setAttribute("aria-label", "Menü öffnen");
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !mainNav.classList.contains("menu-open")) return;
+      mainNav.classList.remove("menu-open");
+      menuButton.setAttribute("aria-expanded", "false");
+      menuButton.setAttribute("aria-label", "Menü öffnen");
+    });
     document.getElementById("authModeToggle").addEventListener("click", () => {
       isRegisterMode = !isRegisterMode;
       authForm.reset();
