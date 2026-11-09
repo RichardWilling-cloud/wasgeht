@@ -12,6 +12,11 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://wasgeht-ab.de/">
   <meta property="og:locale" content="de_DE">
+  <meta property="og:image" content="https://wasgeht-ab.de/assets/logo.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Events in Erfurt | wasgeht">
+  <meta name="twitter:description" content="Raves, Konzerte, Partys und Szene-Events in Erfurt an einem Ort.">
+  <meta name="twitter:image" content="https://wasgeht-ab.de/assets/logo.png">
   <title>Events in Erfurt: Raves, Konzerte &amp; Szene-Treffen | wasgeht</title>
   <script type="application/ld+json" id="siteStructuredData">
     {
@@ -33,6 +38,28 @@
           "isPartOf": { "@id": "https://wasgeht-ab.de/#website" },
           "about": { "@type": "City", "name": "Erfurt", "containedInPlace": { "@type": "State", "name": "Thüringen" } },
           "inLanguage": "de-DE"
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://wasgeht-ab.de/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Welche Raves und Partys gibt es in Erfurt?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "wasgeht bündelt öffentliche Raves, Partys und Clubnächte in Erfurt und lässt sie nach Genre, Datum und Ort filtern."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Wo finde ich Konzerte am Wochenende in Erfurt?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Wähle im Event-Finder die Kategorie Live & Kultur und den Zeitraum Dieses Wochenende, um passende Veranstaltungen in Erfurt zu finden."
+              }
+            }
+          ]
         }
       ]
     }
@@ -282,7 +309,6 @@
     .organizer-copy > p:not(.eyebrow) { max-width: 470px; margin: 0; color: var(--body-copy); font-size: 14px; line-height: 1.65; }
     .organizer-actions { display: flex; align-items: center; gap: 14px; margin-top: 25px; }
     .organizer-actions .surprise { padding: 14px 20px; }
-    .organizer-note { color: var(--muted); font-size: 11px; font-weight: 700; }
     .organizer-features { display: grid; gap: 12px; }
     .organizer-feature {
       display: grid;
@@ -359,6 +385,10 @@
     .arrow-link:hover { background: var(--acid); }
     .empty-state { grid-column: 1/-1; padding: 50px 20px; border: 1px dashed var(--line); text-align: center; color: var(--muted); }
     .empty-state strong { display: block; margin-bottom: 7px; color: var(--ink); font-size: 21px; }
+    .seo-copy { max-width: 760px; margin: 56px auto 0; color: var(--body-copy); font-size: 13px; line-height: 1.6; }
+    .seo-copy h2 { margin: 28px 0 8px; color: var(--ink); font-size: 20px; }
+    .seo-copy h3 { margin: 20px 0 5px; color: var(--ink); font-size: 15px; }
+    .seo-copy p { margin: 8px 0; }
 
     .footer { padding: 27px 0; background: var(--ink); color: white; border-top: 1px solid #44453f; }
     .footer-main { gap: 25px; }
@@ -888,6 +918,8 @@
     <a class="brand" href="#" aria-label="wasgeht Startseite"><span class="brand-mark" role="img" aria-label="wasgeht-ab.de"></span></a>
     <nav class="nav-links" id="mainNavigation" aria-label="Hauptnavigation">
       <a href="#events">Events entdecken</a>
+      <a href="/erfurt/">Alle Erfurt-Events</a>
+      <a href="/erfurt/wochenende/">Dieses Wochenende</a>
       <a href="#veranstalter">Für Veranstalter</a>
     </nav>
     <div class="nav-actions">
@@ -966,7 +998,7 @@
       <div class="load-more" id="loadMoreEvents" hidden>
         <button class="surprise surprise-link" id="loadMoreButton" type="button">Mehr anzeigen</button>
       </div>
-      <div class="seo-copy">
+      <aside class="seo-copy" aria-label="Über die Eventplattform">
         <h2>Veranstaltungen in Erfurt entdecken</h2>
         <p>Was geht in Erfurt? Auf wasgeht findest du aktuelle Events der Stadt und Umgebung an einem Ort. Entdecke Raves, Partys, Konzerte, Kulturveranstaltungen, Szene-Treffen und ruhige Aktivitäten – sortiert nach Genre, Datum und Ort.</p>
         <p>Ob heute spontan etwas los ist, du nach Konzerten am Wochenende suchst oder ein besonderes Event abseits des Mainstreams entdecken möchtest: Durchsuche die Erfurter Veranstaltungsszene und finde Events, die zu dir passen.</p>
@@ -975,7 +1007,7 @@
         <p>Die aktuelle Übersicht zeigt öffentliche Raves, Partys und Clubnächte in Erfurt. Mit dem Genre-Filter kannst du gezielt nach Party- und Rave-Events suchen.</p>
         <h3>Wo finde ich Konzerte am Wochenende?</h3>
         <p>Wähle im Event-Finder die Kategorie „Live &amp; Kultur“ und den Zeitraum „Dieses Wochenende“. Die Liste wird automatisch nach den aktuellen Veranstaltungsdaten gefiltert.</p>
-      </div>
+      </aside>
     </section>
 
     <section class="wrap events organizer-section" id="veranstalter">
@@ -986,8 +1018,7 @@
           <p>Mach deine Veranstaltung in Erfurt sichtbar – vom Clubabend bis zum kleinen Community-Treffen.</p>
           <div class="organizer-actions">
             <button class="surprise" id="addEventButton" type="button">Event eintragen ↗</button>
-            <span class="organizer-note">Öffentlich oder privat – du entscheidest.</span>
-          </div>
+        </div>
         </div>
         <div class="organizer-features" aria-label="Möglichkeiten für Veranstalter">
           <article class="organizer-feature">
@@ -998,14 +1029,6 @@
               <p>Mach es für Menschen sichtbar, die nach ihrem nächsten Erlebnis in Erfurt suchen.</p>
             </div>
           </article>
-          <article class="organizer-feature">
-            <span class="organizer-icon" aria-hidden="true">◉</span>
-            <div>
-              <span class="organizer-feature-label">Privat</span>
-              <h3>Nur für deine Gäste</h3>
-              <p>Lade ausgewählte Personen ein. Ort und Infos bleiben nur für sie sichtbar.</p>
-            </div>
-          </article>
         </div>
       </div>
     </section>
@@ -1014,7 +1037,7 @@
   <footer class="footer">
     <div class="wrap footer-main">
       <a class="brand" href="#" aria-label="wasgeht Startseite"><span class="brand-mark" role="img" aria-label="wasgeht-ab.de"></span></a>
-      <div class="footer-links"><a href="#events">Events entdecken</a><a href="#veranstalter">Event eintragen</a><a href="mailto:hallo@wasgeht.de">Kontakt</a></div>
+      <div class="footer-links"><a href="#events">Events entdecken</a><a href="#veranstalter">Event eintragen</a><a href="mailto:waslos@wasgeht-ab.de">Kontakt</a></div>
       <span class="copyright">© 2026 wasgeht · Erfurt, Thüringen</span>
     </div>
   </footer>
@@ -1049,6 +1072,10 @@
       <p class="dialog-message" id="importSummary" role="status" aria-live="polite">Noch kein Import-Lauf.</p>
       <div class="admin-event-list" id="reviewQueueList" aria-live="polite" style="margin-top: 12px;"></div>
     </div>
+    <div class="admin-import-panel" style="margin-top: 18px; padding: 18px; border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; background: rgba(15, 18, 19, 0.32);">
+      <strong>Event-Vorschläge</strong>
+      <div class="admin-event-list" id="suggestionQueueList" aria-live="polite" style="margin-top: 12px;"></div>
+    </div>
     <div class="admin-event-list" id="adminEventList" aria-live="polite" style="margin-top: 18px;"></div>
   </dialog>
   <dialog class="app-dialog event-dialog" id="eventDialog" aria-labelledby="eventDialogTitle">
@@ -1057,6 +1084,7 @@
     <h2 id="eventDialogTitle">Event erstellen</h2>
     <form id="eventForm">
       <input id="eventId" type="hidden">
+      <input id="eventSourceUrl" type="hidden">
       <label class="dialog-field">Eventname<input id="eventTitle" maxlength="120" required></label>
       <div class="dialog-field-row">
         <label class="dialog-field">Kategorie<input id="eventType" maxlength="40" required></label>
@@ -1077,6 +1105,22 @@
       <label class="dialog-checkbox"><input id="eventIsPublic" type="checkbox" checked> Öffentlich sichtbar</label>
       <p class="dialog-message" id="eventMessage" role="status" aria-live="polite"></p>
       <button class="surprise dialog-submit" type="submit">Speichern</button>
+    </form>
+  </dialog>
+  <dialog class="app-dialog" id="suggestionDialog" aria-labelledby="suggestionTitle">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="Vorschlag schließen"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 3.5 9 9m0-9-9 9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg></button>
+    <p class="eyebrow">EVENT VORSCHLAGEN</p>
+    <h2 id="suggestionTitle">Kennst du ein Event?</h2>
+    <p class="dialog-intro">Reiche es ein. Wir prüfen jeden Vorschlag, bevor er öffentlich erscheint.</p>
+    <form id="suggestionForm">
+      <label class="dialog-field">Eventname<input id="suggestionTitleInput" maxlength="120" required></label>
+      <label class="dialog-field">Datum und Uhrzeit<input id="suggestionDate" type="datetime-local" required></label>
+      <label class="dialog-field">Location<input id="suggestionVenue" maxlength="120" required></label>
+      <label class="dialog-field">Originalquelle<input id="suggestionSourceUrl" type="url" maxlength="1000" placeholder="https://…" required></label>
+      <label class="dialog-field">Kurzbeschreibung<textarea id="suggestionDescription" maxlength="1000" rows="4"></textarea></label>
+      <input id="suggestionWebsite" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px">
+      <p class="dialog-message" id="suggestionMessage" role="status" aria-live="polite"></p>
+      <button class="surprise dialog-submit" type="submit">Vorschlag senden</button>
     </form>
   </dialog>
   <dialog class="app-dialog detail-dialog" id="detailDialog" aria-labelledby="detailTitle">
@@ -1422,6 +1466,7 @@
     const authMessage = document.getElementById("authMessage");
     const adminDialog = document.getElementById("adminDialog");
     const adminEventList = document.getElementById("adminEventList");
+    const suggestionQueueList = document.getElementById("suggestionQueueList");
     const adminEventSearch = document.getElementById("adminEventSearch");
     const eventDialog = document.getElementById("eventDialog");
     const detailDialog = document.getElementById("detailDialog");
@@ -1430,8 +1475,55 @@
     const detailMeta = document.getElementById("detailMeta");
     const detailDescription = document.getElementById("detailDescription");
     const detailSourceLink = document.getElementById("detailSourceLink");
+    const suggestionDialog = document.getElementById("suggestionDialog");
+    const suggestionForm = document.getElementById("suggestionForm");
     let adminEventRecords = [];
     let isRegisterMode = false;
+
+    function openSuggestionDialog() {
+      if (!signedInUser) {
+        openAuthDialog();
+        return;
+      }
+      suggestionForm.reset();
+      document.getElementById("suggestionMessage").textContent = "";
+      suggestionDialog.showModal();
+    }
+
+    async function submitSuggestion(event) {
+      event.preventDefault();
+      const message = document.getElementById("suggestionMessage");
+      if (!supabaseClient || !signedInUser) {
+        message.textContent = "Bitte melde dich zuerst an.";
+        return;
+      }
+      if (document.getElementById("suggestionWebsite").value) return;
+      const startsAt = new Date(document.getElementById("suggestionDate").value);
+      if (Number.isNaN(startsAt.getTime())) {
+        message.textContent = "Bitte gib ein gültiges Datum mit Uhrzeit an.";
+        return;
+      }
+      const { data: suggestion, error } = await supabaseClient.from("event_suggestions").insert({
+        submitted_by: signedInUser.id,
+        title: document.getElementById("suggestionTitleInput").value.trim(),
+        starts_at: startsAt.toISOString(),
+        venue: document.getElementById("suggestionVenue").value.trim(),
+        source_url: document.getElementById("suggestionSourceUrl").value.trim(),
+        description: document.getElementById("suggestionDescription").value.trim(),
+      }).select("id").single();
+      if (error) {
+        message.textContent = error.code === "42501"
+          ? "Heute wurden bereits zu viele Vorschläge von diesem Account gesendet."
+          : `Vorschlag konnte nicht gesendet werden: ${error.message}`;
+        return;
+      }
+      const { error: notificationError } = await supabaseClient.functions.invoke("notify-event-suggestion", {
+        body: { suggestionId: suggestion?.id },
+      });
+      if (notificationError) console.warn("Event suggestion notification failed:", notificationError);
+      suggestionDialog.close();
+      showToast("Danke! Dein Vorschlag wird geprüft.");
+    }
 
     function updateAuthMode() {
       document.getElementById("authTitle").textContent = isRegisterMode ? "Dein neuer Account." : "Schön, dass du da bist.";
@@ -1639,6 +1731,68 @@
       }
       renderAdminEvents(data);
       await loadReviewQueue();
+      await loadSuggestionQueue();
+    }
+
+    async function loadSuggestionQueue() {
+      const { data, error } = await supabaseClient
+        .from("event_suggestions")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) {
+        suggestionQueueList.innerHTML = `<p class="dialog-message">Vorschläge konnten nicht geladen werden: ${escapeHTML(error.message)}</p>`;
+        return;
+      }
+      if (!data?.length) {
+        suggestionQueueList.innerHTML = '<p class="dialog-message">Keine neuen Vorschläge.</p>';
+        return;
+      }
+      suggestionQueueList.innerHTML = data.map((record) => `
+        <article class="admin-event-row">
+          <div class="admin-event-name">
+            <strong>${escapeHTML(record.title)}</strong>
+            <span>${escapeHTML(formatEventDate(record.starts_at))} · ${escapeHTML(record.venue)}</span>
+            <a class="admin-source-link" href="${escapeHTML(record.source_url)}" target="_blank" rel="noopener noreferrer">Originalquelle ↗</a>
+          </div>
+          <div class="admin-event-actions">
+            <button type="button" data-suggestion-action="edit" data-suggestion-id="${escapeHTML(record.id)}">Übernehmen</button>
+            <button class="delete-event" type="button" data-suggestion-action="reject" data-suggestion-id="${escapeHTML(record.id)}">Verwerfen</button>
+          </div>
+        </article>`).join("");
+    }
+
+    async function handleSuggestionAction(action, suggestionId) {
+      const { data, error } = await supabaseClient
+        .from("event_suggestions")
+        .select("*")
+        .eq("id", suggestionId)
+        .maybeSingle();
+      if (error || !data) {
+        showToast("Vorschlag konnte nicht geladen werden.");
+        return;
+      }
+      if (action === "reject") {
+        const { error: rejectError } = await supabaseClient
+          .from("event_suggestions")
+          .update({ status: "rejected" })
+          .eq("id", suggestionId);
+        if (rejectError) {
+          showToast(`Vorschlag konnte nicht verworfen werden: ${rejectError.message}`);
+          return;
+        }
+      } else {
+        openEventEditor({
+          title: data.title,
+          starts_at: data.starts_at,
+          venue: data.venue,
+          source_url: data.source_url,
+          description: data.description,
+          status: "needs_review",
+        });
+        return;
+      }
+      await loadSuggestionQueue();
     }
 
     function renderReviewQueue(records) {
@@ -1731,6 +1885,7 @@
       document.getElementById("eventPrice").value = record?.price || "";
       document.getElementById("eventPoster").value = String(record?.poster || 1);
       document.getElementById("eventImageUrl").value = record?.image_url || "";
+      document.getElementById("eventSourceUrl").value = record?.source_url || "";
       document.getElementById("eventArt").value = (record?.art || "").replace(/<br\s*\/?>/gi, "\n");
       document.getElementById("eventDescription").value = record?.description || "";
       document.getElementById("eventIsPublic").checked = record?.is_public ?? true;
@@ -1766,6 +1921,7 @@
         price: document.getElementById("eventPrice").value.trim() || "Eintritt frei",
         poster: Number(document.getElementById("eventPoster").value),
         image_url: imageUrl,
+        source_url: document.getElementById("eventSourceUrl").value.trim() || null,
         art: document.getElementById("eventArt").value.trim(),
         description: document.getElementById("eventDescription").value.trim(),
         is_public: document.getElementById("eventIsPublic").checked,
@@ -2088,6 +2244,10 @@
       const button = event.target.closest("button[data-review-action]");
       if (button) void handleReviewAction(button.dataset.reviewAction, button.dataset.eventId);
     });
+    suggestionQueueList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-suggestion-action]");
+      if (button) void handleSuggestionAction(button.dataset.suggestionAction, button.dataset.suggestionId);
+    });
     document.getElementById("eventForm").addEventListener("submit", saveEvent);
     document.querySelectorAll("[data-close-dialog]").forEach((button) => {
       button.addEventListener("click", () => button.closest("dialog").close());
@@ -2134,11 +2294,8 @@
       chosen.animate([{ transform: "scale(1)" }, { transform: "scale(1.035)" }, { transform: "scale(1)" }], { duration: 550 });
       showToast(`Dein Zufallstipp: ${chosen.querySelector("h3").textContent}`);
     });
-    document.getElementById("addEventButton").addEventListener("click", () => {
-      if (signedInRole === "admin") openEventEditor();
-      else if (!signedInUser) openAuthDialog();
-      else showToast("Dein Account ist angemeldet. Das Eintragen eigener Events kommt als nächster Schritt.");
-    });
+    document.getElementById("addEventButton").addEventListener("click", openSuggestionDialog);
+    suggestionForm.addEventListener("submit", submitSuggestion);
     observeRevealElements();
     void initializeSupabase();
   </script>

@@ -34,6 +34,18 @@ const formatDate = (value) => new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
 }).format(new Date(value));
 
+const numericPrice = (value) => {
+  const match = String(value ?? "").replace(",", ".").match(/\d+(?:\.\d{1,2})?/);
+  return match ? Number(match[0]).toFixed(2) : null;
+};
+
+const genrePages = [
+  { slug: "rave", genre: "party", title: "Raves & Partys in Erfurt", description: "Raves, Clubnächte und Partys in Erfurt – aktuelle Termine auf wasgeht." },
+  { slug: "konzerte", genre: "live", title: "Konzerte & Live-Events in Erfurt", description: "Konzerte, Live-Musik und Kulturveranstaltungen in Erfurt entdecken." },
+  { slug: "szene", genre: "szene", title: "Szene-Events in Erfurt", description: "Märkte, Nerd-, Gothic-, LARP- und weitere Szene-Events in Erfurt." },
+  { slug: "ruhig", genre: "chill", title: "Ruhige Veranstaltungen in Erfurt", description: "Lesungen, Workshops und entspannte Veranstaltungen in Erfurt." },
+];
+
 const response = await fetch(
   `${supabaseUrl}/rest/v1/events?select=id,title,type,genre,starts_at,place,venue,price,description,image_url,source_url,is_public,status&is_public=eq.true&status=eq.published&order=starts_at.asc`,
   { headers: { apikey: publishableKey, Authorization: `Bearer ${publishableKey}` } },
@@ -48,19 +60,20 @@ await mkdir(join(outputDirectory, "event"), { recursive: true });
 
 const usedSlugs = new Set();
 const urls = [{ loc: `${siteUrl}/`, changefreq: "daily", priority: "1.0" }];
-
-for (const event of events) {
+const eventEntries = events.map((event) => {
   const baseSlug = slugify(event.title) || "event";
-  let slug = `${baseSlug}-${new Date(event.starts_at).toISOString().slice(0, 10)}`;
+  const dateSlug = new Date(event.starts_at).toISOString().slice(0, 10);
+  let slug = `${baseSlug}-${dateSlug}`;
   let suffix = 2;
-  while (usedSlugs.has(slug)) slug = `${baseSlug}-${new Date(event.starts_at).toISOString().slice(0, 10)}-${suffix++}`;
+  while (usedSlugs.has(slug)) slug = `${baseSlug}-${dateSlug}-${suffix++}`;
   usedSlugs.add(slug);
+  return { event, slug, pageUrl: `${siteUrl}/event/${slug}/` };
+});
 
-  const pageUrl = `${siteUrl}/event/${slug}/`;
+for (const { event, slug, pageUrl } of eventEntries) {
   const image = event.image_url ? `<img src="${escapeHtml(event.image_url)}" alt="${escapeHtml(event.title)}">` : "";
   const description = event.description || `${event.title} in ${event.venue}, Erfurt.`;
-  const schema = {
-    "@context": "https://schema.org",
+  const eventSchema = {
     "@type": "Event",
     "@id": pageUrl,
     name: event.title,
@@ -80,6 +93,29 @@ for (const event of events) {
     url: pageUrl,
     ...(event.image_url ? { image: [event.image_url] } : {}),
     ...(event.source_url ? { sameAs: event.source_url } : {}),
+    ...(numericPrice(event.price) ? {
+      offers: {
+        "@type": "Offer",
+        price: numericPrice(event.price),
+        priceCurrency: "EUR",
+        url: pageUrl,
+        availability: "https://schema.org/InStock",
+      },
+    } : {}),
+  };
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      eventSchema,
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "wasgeht", item: `${siteUrl}/` },
+        { "@type": "ListItem", position: 2, name: "Events in Erfurt", item: `${siteUrl}/erfurt/` },
+        { "@type": "ListItem", position: 3, name: event.title, item: pageUrl },
+      ],
+      },
+    ],
   };
   const html = `<!doctype html>
 <html lang="de">
@@ -121,6 +157,107 @@ for (const event of events) {
   await writeFile(join(directory, "index.html"), html);
   urls.push({ loc: pageUrl, lastmod: new Date().toISOString(), changefreq: "daily", priority: "0.8" });
 }
+
+const landingPageStyle = `
+  :root { color-scheme: light; font-family: Helvetica, Arial, sans-serif; color: #2d252c; background: #f3edf0; }
+  body { max-width: 1000px; margin: 0 auto; padding: 32px 20px 64px; }
+  a { color: inherit; } .eyebrow { letter-spacing: .12em; font-size: 12px; font-weight: 700; }
+  .event-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+  article { padding: 20px; border: 1px solid rgba(255,255,255,.8); border-radius: 24px; background: rgba(255,255,255,.52); }
+  article h2 { margin: 8px 0; font-size: 20px; } .meta { color: #6b6069; line-height: 1.6; } p { line-height: 1.7; }
+  .links { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0; } .links a { padding: 10px 14px; border-radius: 999px; background: rgba(255,255,255,.65); }
+`;
+
+const renderLandingPage = async ({ path, title, description, pageEvents, intro }) => {
+  const pageUrl = `${siteUrl}/${path}/`;
+  const cards = pageEvents.length
+    ? pageEvents.map(({ event, pageUrl: eventUrl }) => `
+      <article>
+        <p class="eyebrow">${escapeHtml(event.type || "EVENT")}</p>
+        <h2><a href="${eventUrl}">${escapeHtml(event.title)}</a></h2>
+        <p class="meta">${escapeHtml(formatDate(event.starts_at))}<br>${escapeHtml(event.venue)} · ${escapeHtml(event.place === "nearby" ? "Umgebung von Erfurt" : "Erfurt")}</p>
+        <a href="${eventUrl}">Details ansehen ↗</a>
+      </article>`).join("")
+    : "<p>Aktuell sind keine passenden Veranstaltungen veröffentlicht.</p>";
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": pageUrl,
+    name: title,
+    description,
+    url: pageUrl,
+    isPartOf: { "@id": `${siteUrl}/#website` },
+    about: { "@type": "City", name: "Erfurt" },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: pageEvents.map(({ pageUrl: eventUrl }, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: eventUrl,
+      })),
+    },
+  };
+  const html = `<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} | wasgeht</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <link rel="canonical" href="${pageUrl}">
+  <meta property="og:title" content="${escapeHtml(title)} | wasgeht">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:type" content="website"><meta property="og:url" content="${pageUrl}">
+  <script type="application/ld+json">${escapeJson(schema)}</script>
+  <style>${landingPageStyle}</style>
+</head>
+<body>
+  <p><a href="${siteUrl}/">← wasgeht Startseite</a></p>
+  <p class="eyebrow">EVENTS IN ERFURT</p>
+  <h1>${escapeHtml(title)}</h1>
+  <p>${escapeHtml(intro)}</p>
+  <nav class="links" aria-label="Weitere Eventübersichten">
+    <a href="${siteUrl}/erfurt/">Alle Events</a>
+    ${genrePages.map((genrePage) => `<a href="${siteUrl}/erfurt/${genrePage.slug}/">${escapeHtml(genrePage.title.replace(" in Erfurt", ""))}</a>`).join("")}
+    <a href="${siteUrl}/erfurt/wochenende/">Dieses Wochenende</a>
+  </nav>
+  <main class="event-grid">${cards}</main>
+</body>
+</html>`;
+  const directory = join(outputDirectory, ...path.split("/"));
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "index.html"), html);
+  urls.push({ loc: pageUrl, lastmod: new Date().toISOString(), changefreq: "daily", priority: "0.9" });
+};
+
+await renderLandingPage({
+  path: "erfurt",
+  title: "Events in Erfurt",
+  description: "Alle aktuellen Veranstaltungen, Raves, Konzerte und Szene-Events in Erfurt auf einen Blick.",
+  pageEvents: eventEntries,
+  intro: "Was geht in Erfurt? Hier findest du die aktuellen öffentlichen Veranstaltungen der Stadt und Umgebung – täglich aktualisiert.",
+});
+for (const genrePage of genrePages) {
+  await renderLandingPage({
+    path: `erfurt/${genrePage.slug}`,
+    title: genrePage.title,
+    description: genrePage.description,
+    pageEvents: eventEntries.filter(({ event }) => event.genre === genrePage.genre),
+    intro: genrePage.description,
+  });
+}
+
+const today = new Date();
+const weekendEvents = eventEntries.filter(({ event }) => {
+  const eventDate = new Date(event.starts_at);
+  return eventDate >= today && eventDate.getTime() <= today.getTime() + (8 * 24 * 60 * 60 * 1000);
+});
+await renderLandingPage({
+  path: "erfurt/wochenende",
+  title: "Events am Wochenende in Erfurt",
+  description: "Raves, Konzerte und Veranstaltungen am Wochenende in Erfurt.",
+  pageEvents: weekendEvents,
+  intro: "Finde aktuelle Veranstaltungen für dein Wochenende in Erfurt. Die Übersicht wird automatisch mit den veröffentlichten Events aktualisiert.",
+});
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

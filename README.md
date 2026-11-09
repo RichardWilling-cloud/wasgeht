@@ -15,7 +15,7 @@ Im Repository liegt zusätzlich eine Expo-/React-Native-App. Sie verwendet diese
 
 ### SEO
 
-Die Website enthält eine optimierte Startseiten-Meta-Beschreibung, Canonical- und Open-Graph-Metadaten, semantische Event-Markup-Daten für veröffentlichte öffentliche Events sowie crawlbare Inhalte zu Veranstaltungen in Erfurt. `robots.txt` verweist auf `sitemap.xml`; beide Dateien müssen beim Hosting unter der Domain-Wurzel veröffentlicht werden. Eventdaten werden nach dem Laden aus Supabase als Schema.org-`Event`-Einträge ergänzt. Private oder nicht veröffentlichte Events werden dabei niemals ausgegeben.
+Die Website enthält optimierte Meta- und Open-Graph-Daten, FAQ- und semantische Event-Markups für veröffentlichte öffentliche Events sowie crawlbare Inhalte zu Veranstaltungen in Erfurt. Der GitHub-Pages-Workflow erzeugt zusätzlich Landingpages für Erfurt, Raves, Konzerte, Szene-Events, ruhige Veranstaltungen und das Wochenende. `robots.txt` verweist auf die automatisch aktualisierte `sitemap.xml`; beide Dateien müssen beim Hosting unter der Domain-Wurzel veröffentlicht werden. Private oder nicht veröffentlichte Events werden dabei niemals ausgegeben.
 
 ### Lokal starten
 
@@ -78,6 +78,10 @@ Die Website wird bei jedem Push auf `main` automatisch mit GitHub Actions auf Gi
 In der schmalen Statuszeile am oberen Rand zeigt `Live · Datum · #Laufnummer` die veröffentlichte Website-Version. Der zugehörige Commit ist beim Darüberfahren sichtbar. Eine lokale oder noch nicht veröffentlichte Kopie wird stattdessen als `Lokal · nicht veröffentlicht` markiert.
 
 Der GitHub-Pages-Workflow erzeugt vor jedem Deployment zusätzlich statische SEO-Seiten für alle öffentlichen, veröffentlichten Events unter `/event/.../`. Er läuft automatisch täglich um 03:30 UTC, also nach dem nächtlichen Import und der Archivierung, und aktualisiert dabei auch `sitemap.xml`. Neue Events werden dadurch ohne manuellen Deploy in die Suchmaschinen-Seiten aufgenommen.
+
+Eventvorschläge werden nur von angemeldeten Accounts angenommen, auf fünf Vorschläge je 24 Stunden begrenzt und erst nach Admin-Prüfung veröffentlicht. Für E-Mail-Benachrichtigungen die Function `notify-event-suggestion` mit `RESEND_API_KEY`, `EVENT_SUGGESTION_RECIPIENT` und `EVENT_SUGGESTION_SENDER` als Function Secrets deployen. Die Absenderdomain muss zuvor bei Resend verifiziert werden.
+
+Der Quellenadapter für [Campus Erfurt](https://www.campus-erfurt.de/veranstaltungskalender1) ruft den clientseitig eingebundenen ThüCAT-Kalender serverseitig ab und fasst die einzelnen Termine einer Ausstellung zu einem Event mit Zeitraum zusammen. Bei inhaltlich gleichen Events bleibt die spezifischere Originalquelle bevorzugt; Campus Erfurt dient als zusätzliche Auffangquelle. Die Quelle kann mit [`supabase/add-campus-erfurt-source.sql`](./supabase/add-campus-erfurt-source.sql) einzeln ergänzt werden.
 
 Das Repository liegt unter <https://github.com/RichardWilling-cloud/wasgeht>.
 

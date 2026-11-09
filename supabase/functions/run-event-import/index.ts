@@ -70,11 +70,32 @@ function isDuplicate(existing, candidate) {
   const titleScore = similarity(existing.title, candidate.title);
   const placeScore = similarity(existing.location_name || existing.venue, candidate.location_name);
   const sameSource = existing.source_url && existing.source_url === candidate.source_url;
+  const existingEnd = new Date(existing.end_datetime || existing.start_datetime || existing.starts_at || 0).getTime();
+  const candidateEnd = new Date(candidate.end_datetime || candidate.start_datetime || 0).getTime();
+  const rangesOverlap = Boolean(
+    existing.start_datetime
+    && candidate.start_datetime
+    && existingEnd >= new Date(candidate.start_datetime).getTime()
+    && candidateEnd >= new Date(existing.start_datetime).getTime(),
+  );
   const placeMatchesOrIsUnknown = !existing.location_name && !existing.venue
     || !candidate.location_name
     || placeScore >= 0.45;
   return Boolean(sameSource && titleScore >= 0.6)
-    || Boolean(sameDate && titleScore >= 0.9 && placeMatchesOrIsUnknown);
+    || Boolean(sameDate && titleScore >= 0.9 && placeMatchesOrIsUnknown)
+    || Boolean(rangesOverlap && titleScore >= 0.9 && placeMatchesOrIsUnknown);
+}
+
+function sourcePriority(sourceName = "") {
+  const name = normalizeText(sourceName);
+  if (name.includes("campus erfurt")) return 10;
+  if (name === "websuche" || name.includes("google")) return 20;
+  if (name.includes("instagram")) return 20;
+  return 100;
+}
+
+function shouldPreferSource(existingName, candidateName) {
+  return sourcePriority(candidateName) >= sourcePriority(existingName);
 }
 
 async function sha256(value) {
@@ -869,6 +890,7 @@ function structuredEventsFromHtml(html, source) {
           source_name: source.source_name,
         });
       }
+
     } catch (error) {
       console.warn(`Could not parse JSON-LD from ${source.source_name}:`, error);
     }
@@ -932,6 +954,131 @@ function structuredEventsFromHtml(html, source) {
   return candidates.slice(0, 25);
 }
 
+function campusDateTime(dateText, timeText = "00:00:00") {
+  if (!dateText) return null;
+  const [year, month, day] = String(dateText).split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return null;
+  const [hour = 0, minute = 0, second = 0] = String(timeText).split(":").map(Number);
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
+  const berlinTime = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Berlin",
+    timeZoneName: "shortOffset",
+  }).formatToParts(new Date(utcGuess)).find((part) => part.type === "timeZoneName")?.value;
+  const offset = berlinTime?.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+  if (!offset) return null;
+  const offsetMinutes = (Number(offset[2]) * 60 + Number(offset[3] || 0))
+    * (offset[1] === "-" ? -1 : 1);
+  return new Date(utcGuess - offsetMinutes * 60_000).toISOString();
+}
+
+async function campusErfurtCandidates(html, source) {
+  const componentId = html.match(/<tourism-components\b[^>]*\btc-config-id=["']([^"']+)["']/i)?.[1]
+    || "d438e0da-0ca8-401b-9e7f-beb0d1292b37";
+  const start = new Date();
+  const startDate = start.toISOString().slice(0, 10);
+  const response = await fetchWithTimeout("https://widgets.thuecat.org/api/scenario/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "TC-Component-ID": componentId,
+      "TC-Session-ID": crypto.randomUUID(),
+      Referer: source.url,
+    },
+    body: JSON.stringify({
+      opts: {
+        limit: 250,
+        maxResultSize: 250,
+        sort: [{ fieldName: "startDate", order: "asc" }],
+        filter: [{
+          filterType: "eventDateRange",
+          fieldName: "startDate",
+          values: { start: `${startDate}T00:00:00.000+01:00` },
+        }],
+        fallbackLanguage: "de",
+        documentLanguage: "de",
+      },
+      responseFormats: ["minimal", "eventdata", "geodata"],
+      size: 250,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Campus Erfurt API responded with HTTP ${response.status}`);
+  }
+  const payload = await response.json();
+  const candidates = (payload.records || []).map((record) => {
+    const minimal = record.minimal || {};
+    const eventData = record.eventdata || {};
+    const dates = eventData.dates || [];
+    const firstDate = dates[0];
+    const lastDate = dates.at(-1) || firstDate;
+    const valid = eventData.valid || {};
+    const startDatetime = campusDateTime(
+      firstDate?.startDate || valid.from?.slice(0, 10),
+      firstDate?.startTime || "00:00:00",
+    );
+    const endDatetime = campusDateTime(
+      lastDate?.startDate || valid.to?.slice(0, 10),
+      lastDate?.endTime || lastDate?.startTime || "23:59:59",
+    ) || valid.to || startDatetime;
+    const title = minimal.title?.de || minimal.title || null;
+    const description = minimal.description?.de || minimal.description || null;
+    const location = minimal.location || {};
+    const locationName = location.name?.de || location.name || null;
+    const address = location.streetAddress?.de || location.streetAddress || null;
+    const city = location.addressLocality?.de || location.addressLocality || "Erfurt";
+    return {
+      raw_text: JSON.stringify(record).slice(0, 8000),
+      title,
+      description,
+      start_datetime: startDatetime,
+      end_datetime: endDatetime,
+      city,
+      location_name: locationName,
+      address,
+      source_url: source.url,
+      image_url: null,
+      source_type: "website",
+      source_name: source.source_name,
+    };
+  }).filter((candidate) => candidate.title && candidate.start_datetime);
+
+  const merged = new Map();
+  for (const candidate of candidates) {
+    const baseKey = `${normalizeText(candidate.title)}|${normalizeText(candidate.location_name || "")}`;
+    let key = baseKey;
+    const existing = merged.get(key);
+    const existingStart = new Date(existing?.start_datetime || 0).getTime();
+    const candidateStart = new Date(candidate.start_datetime || 0).getTime();
+    const existingEnd = new Date(existing?.end_datetime || existing?.start_datetime || 0).getTime();
+    const candidateEnd = new Date(candidate.end_datetime || candidate.start_datetime || 0).getTime();
+    const nearOrOverlapping = Boolean(
+      existing
+      && candidateStart
+      && existingStart
+      && (
+        Math.abs(existingStart - candidateStart) <= 24 * 60 * 60 * 1000
+        || (existingEnd >= candidateStart && candidateEnd >= existingStart)
+      ),
+    );
+    if (!existing || !nearOrOverlapping) {
+      if (existing) {
+        key = `${baseKey}|${candidate.start_datetime || merged.size}`;
+        while (merged.has(key)) key = `${key}-next`;
+      }
+      merged.set(key, candidate);
+      continue;
+    }
+    const starts = [existing.start_datetime, candidate.start_datetime].filter(Boolean).sort();
+    const ends = [existing.end_datetime, candidate.end_datetime, ...starts].filter(Boolean).sort();
+    existing.start_datetime = starts[0] || null;
+    existing.end_datetime = ends.at(-1) || null;
+    existing.raw_text = [existing.raw_text, candidate.raw_text].filter(Boolean).join("\n").slice(0, 8000);
+    if (!existing.description && candidate.description) existing.description = candidate.description;
+    if (!existing.image_url && candidate.image_url) existing.image_url = candidate.image_url;
+  }
+  return [...merged.values()].slice(0, 50);
+}
+
 async function fetchWebsiteCandidates(source) {
   if (!source.url) throw new Error("Website source has no URL");
   const url = new URL(source.url);
@@ -960,6 +1107,8 @@ async function fetchWebsiteCandidates(source) {
     candidates = retronomCandidates(html, source);
   } else if (url.hostname === "klanggeruest.de") {
     candidates = klanggeruestCandidates(html, source);
+  } else if (url.hostname === "www.campus-erfurt.de" && url.pathname === "/veranstaltungskalender1") {
+    candidates = await campusErfurtCandidates(html, source);
   } else if (url.hostname === "cafe-kunst-bar.com" && /<ul\b[^>]*class=["'][^"']*\bevents\b[^"']*\bdiary\b[^"']*\bfuture\b/i.test(html)) {
     candidates = structuredEventsFromHtml(html, source);
     if (!candidates.length) return [];
@@ -1340,7 +1489,9 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
             if (!dryRun) {
               const patch = {
                 last_seen_at: new Date().toISOString(),
-                ...(match.source_name !== event.source_name ? { source_name: event.source_name } : {}),
+                ...(match.source_name !== event.source_name && shouldPreferSource(match.source_name, event.source_name)
+                  ? { source_name: event.source_name }
+                  : {}),
                 ...(event.image_url && !match.image_url ? { image_url: event.image_url } : {}),
               };
               if (Object.keys(patch).length > 1) await patchEvent(match.id, patch, accessToken);
@@ -1349,7 +1500,12 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
           } else if (dryRun) {
             stats.updated += 1;
           } else {
-            await patchEvent(match.id, eventPatch(event, hash), accessToken);
+            const fullPatch = eventPatch(event, hash);
+            const { source_url: _sourceUrl, source_type: _sourceType, source_name: _sourceName, ...contentPatch } = fullPatch;
+            const patch = match.source_name && !shouldPreferSource(match.source_name, event.source_name)
+              ? contentPatch
+              : fullPatch;
+            await patchEvent(match.id, patch, accessToken);
             stats.updated += 1;
           }
         } else if (dryRun) {

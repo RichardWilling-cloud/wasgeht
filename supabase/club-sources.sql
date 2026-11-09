@@ -30,7 +30,8 @@ from (values
   ('Erfurt', 'website', 'Jazz Club', 'https://www.jazzclub-erfurt.de'),
   ('Erfurt', 'website', 'Zughafen', 'https://zughafen.de/events/'),
   ('Erfurt', 'website', 'jederkann', 'https://www.jederkann.online/veranstaltungen/'),
-  ('Erfurt', 'website', 'Planet Comics Cafe', 'https://planetcomicserfurt.de/events/')
+  ('Erfurt', 'website', 'Planet Comics Cafe', 'https://planetcomicserfurt.de/events/'),
+  ('Erfurt', 'website', 'Campus Erfurt', 'https://www.campus-erfurt.de/veranstaltungskalender1')
 ) as seed(city, source_type, source_name, url)
 where existing.city = seed.city
   and existing.source_name = seed.source_name;
@@ -51,7 +52,8 @@ from (values
   ('Erfurt', 'website', 'Jazz Club', 'https://www.jazzclub-erfurt.de'),
   ('Erfurt', 'website', 'Zughafen', 'https://zughafen.de/events/'),
   ('Erfurt', 'website', 'jederkann', 'https://www.jederkann.online/veranstaltungen/'),
-  ('Erfurt', 'website', 'Planet Comics Cafe', 'https://planetcomicserfurt.de/events/')
+  ('Erfurt', 'website', 'Planet Comics Cafe', 'https://planetcomicserfurt.de/events/'),
+  ('Erfurt', 'website', 'Campus Erfurt', 'https://www.campus-erfurt.de/veranstaltungskalender1')
 ) as seed(city, source_type, source_name, url)
 where not exists (
   select 1

@@ -27,6 +27,43 @@ create table if not exists public.events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.event_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  submitted_by uuid not null references auth.users (id) on delete cascade,
+  title text not null check (char_length(title) between 1 and 120),
+  starts_at timestamptz not null,
+  venue text not null check (char_length(venue) between 1 and 120),
+  source_url text not null check (source_url ~* '^https?://'),
+  description text not null default '' check (char_length(description) <= 1000),
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists event_suggestions_status_idx
+  on public.event_suggestions (status, created_at desc);
+
+alter table public.event_suggestions enable row level security;
+
+create or replace function public.can_submit_event_suggestion()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*) < 5
+  from public.event_suggestions
+  where submitted_by = (select auth.uid())
+    and created_at > now() - interval '24 hours';
+$$;
+
+revoke all on function public.can_submit_event_suggestion() from public;
+grant execute on function public.can_submit_event_suggestion() to authenticated;
+
+revoke all on public.event_suggestions from anon, authenticated;
+grant insert on public.event_suggestions to authenticated;
+grant select, update, delete on public.event_suggestions to authenticated;
+
 create index if not exists events_public_order_idx
   on public.events (is_public, sort_order, starts_at);
 
@@ -47,6 +84,31 @@ $$;
 
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to anon, authenticated;
+
+drop policy if exists "Users submit event suggestions" on public.event_suggestions;
+create policy "Users submit event suggestions"
+  on public.event_suggestions
+  for insert
+  to authenticated
+  with check (
+    submitted_by = (select auth.uid())
+    and (select public.can_submit_event_suggestion())
+  );
+
+drop policy if exists "Users read own event suggestions" on public.event_suggestions;
+create policy "Users read own event suggestions"
+  on public.event_suggestions
+  for select
+  to authenticated
+  using (submitted_by = (select auth.uid()) or (select public.is_admin()));
+
+drop policy if exists "Admins manage event suggestions" on public.event_suggestions;
+create policy "Admins manage event suggestions"
+  on public.event_suggestions
+  for all
+  to authenticated
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
 
 create or replace function public.create_profile_for_new_user()
 returns trigger
