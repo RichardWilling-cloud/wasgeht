@@ -7,6 +7,7 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#2d2b30">
   <script>try{var d=document.documentElement,u=navigator.userAgent||"",p=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||"";if(/Windows/i.test(u+" "+p)||/Firefox/i.test(u))d.classList.add("performance-lite");if(localStorage.getItem("wasgeht-theme")==="light")d.dataset.theme="light"}catch(e){}</script>
+  <script src="site.js"></script>
   <link rel="icon" href="/assets/icon.png" type="image/png">
   <link rel="apple-touch-icon" href="/assets/icon.png">
   <link rel="preconnect" href="https://zvhvofgpizwhtxmcnghm.supabase.co" crossorigin>
@@ -18,14 +19,14 @@
   <meta property="og:url" content="https://wasgeht-ab.de/">
   <meta property="og:locale" content="de_DE">
   <meta property="og:site_name" content="wasgeht">
-  <meta property="og:image" content="https://wasgeht-ab.de/assets/logo.png">
-  <meta property="og:image:width" content="570">
-  <meta property="og:image:height" content="226">
-  <meta property="og:image:alt" content="wasgeht-ab.de Logo">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://wasgeht-ab.de/assets/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WAS GEHT AB? – Events in Erfurt">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Events in Erfurt | wasgeht">
   <meta name="twitter:description" content="Raves, Konzerte, Partys und Szene-Events in Erfurt an einem Ort.">
-  <meta name="twitter:image" content="https://wasgeht-ab.de/assets/logo.png">
+  <meta name="twitter:image" content="https://wasgeht-ab.de/assets/og-image.jpg">
   <title>Events in Erfurt: Raves, Konzerte &amp; Szene-Treffen | wasgeht</title>
   <script type="application/ld+json" id="siteStructuredData">
     {
@@ -63,10 +64,18 @@
           "mainEntity": [
             {
               "@type": "Question",
+              "name": "Was ist heute in Erfurt los?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Alle Veranstaltungen von heute findest du unter „Events heute in Erfurt“ oder im Event-Finder mit dem Zeitraum „Heute“. Die Übersicht wird täglich aktualisiert."
+              }
+            },
+            {
+              "@type": "Question",
               "name": "Welche Raves und Partys gibt es in Erfurt?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "wasgeht bündelt öffentliche Raves, Partys und Clubnächte in Erfurt und lässt sie nach Genre, Datum und Ort filtern."
+                "text": "Die aktuelle Übersicht zeigt öffentliche Raves, Partys und Clubnächte in Erfurt – von Techno im Club bis zur 80er-Party. Gesammelt auf der Seite „Partys & Raves in Erfurt“."
               }
             },
             {
@@ -74,7 +83,15 @@
               "name": "Wo finde ich Konzerte am Wochenende in Erfurt?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Wähle im Event-Finder die Kategorie Live & Kultur und den Zeitraum Dieses Wochenende, um passende Veranstaltungen in Erfurt zu finden."
+                "text": "Wähle im Event-Finder die Kategorie „Live & Kultur“ und den Zeitraum „Dieses Wochenende“ – oder schau direkt auf „Events am Wochenende in Erfurt“."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Woher kommen die Veranstaltungen?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "wasgeht sammelt täglich die Programme Erfurter Clubs, Bars, Kulturzentren und Veranstalter und verlinkt bei jedem Event die Originalquelle. Veranstalter können ihre Events außerdem selbst eintragen."
               }
             }
           ]
@@ -413,6 +430,10 @@
     .footer .brand { font-size: 20px; }
     .footer-links { display: flex; gap: 23px; color: #c6c6bd; font-size: 11px; }
     .copyright { color: #92938c; font-size: 10px; }
+    .footer-seo { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; letter-spacing: .02em; }
+    .footer-seo a:hover { color: var(--blue); }
+    .seo-copy a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); }
+    .seo-copy a:hover { color: var(--blue); }
     .footer-link-button { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
     .footer-link-button:hover { color: var(--blue); }
     .event-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 4px; }
@@ -964,7 +985,7 @@
   <main>
     <section class="wrap hero">
       <div class="hero-copy">
-        <h1>WAS GEHT<br><em>AB?</em></h1>
+        <h1>WAS GEHT<br><em>AB?</em><span class="visually-hidden"> – Events, Partys und Konzerte in Erfurt</span></h1>
         <div class="hero-bottom">
           <p class="hero-intro">Raves, Konzerte, Szene-Treffen und alternative Angebote. Was geht, findest du hier.</p>
         </div>
@@ -1023,11 +1044,17 @@
         <h2>Veranstaltungen in Erfurt entdecken</h2>
         <p>Was geht in Erfurt? Auf wasgeht findest du aktuelle Events der Stadt und Umgebung an einem Ort. Entdecke Raves, Partys, Konzerte, Kulturveranstaltungen, Szene-Treffen und ruhige Aktivitäten – sortiert nach Genre, Datum und Ort.</p>
         <p>Ob heute spontan etwas los ist, du nach Konzerten am Wochenende suchst oder ein besonderes Event abseits des Mainstreams entdecken möchtest: Durchsuche die Erfurter Veranstaltungsszene und finde Events, die zu dir passen.</p>
+        <p>Schnell zum Ziel: <a href="/erfurt/heute/">Was ist heute los in Erfurt?</a> · <a href="/erfurt/wochenende/">Events am Wochenende</a> · <a href="/erfurt/diese-woche/">Diese Woche</a> · <a href="/erfurt/rave/">Partys &amp; Raves</a> · <a href="/erfurt/konzerte/">Konzerte</a> · <a href="/erfurt/szene/">Szene &amp; Nerd</a> · <a href="/erfurt/ruhig/">Ruhige Events</a> · <a href="/erfurt/">Alle Events in Erfurt</a></p>
+        <!--VENUE_LINKS-->
         <h2>Häufige Fragen zu Events in Erfurt</h2>
+        <h3>Was ist heute in Erfurt los?</h3>
+        <p>Alle Veranstaltungen von heute findest du unter <a href="/erfurt/heute/">Events heute in Erfurt</a> oder im Event-Finder mit dem Zeitraum „Heute“. Die Übersicht wird täglich aktualisiert.</p>
         <h3>Welche Raves und Partys gibt es in Erfurt?</h3>
-        <p>Die aktuelle Übersicht zeigt öffentliche Raves, Partys und Clubnächte in Erfurt. Mit dem Genre-Filter kannst du gezielt nach Party- und Rave-Events suchen.</p>
+        <p>Die aktuelle Übersicht zeigt öffentliche Raves, Partys und Clubnächte in Erfurt – von Techno im Club bis zur 80er-Party. Gesammelt auf der Seite <a href="/erfurt/rave/">Partys &amp; Raves in Erfurt</a>.</p>
         <h3>Wo finde ich Konzerte am Wochenende?</h3>
-        <p>Wähle im Event-Finder die Kategorie „Live &amp; Kultur“ und den Zeitraum „Dieses Wochenende“. Die Liste wird automatisch nach den aktuellen Veranstaltungsdaten gefiltert.</p>
+        <p>Wähle im Event-Finder die Kategorie „Live &amp; Kultur“ und den Zeitraum „Dieses Wochenende“ – oder schau direkt auf <a href="/erfurt/wochenende/">Events am Wochenende in Erfurt</a>.</p>
+        <h3>Woher kommen die Veranstaltungen?</h3>
+        <p>wasgeht sammelt täglich die Programme Erfurter Clubs, Bars, Kulturzentren und Veranstalter und verlinkt bei jedem Event die Originalquelle. Veranstalter können ihre Events außerdem selbst eintragen.</p>
       </aside>
     </section>
 
@@ -1061,6 +1088,7 @@
       <div class="footer-links"><a href="#events">Events entdecken</a><a href="#veranstalter">Event eintragen</a><a href="mailto:waslos@wasgeht-ab.de">Kontakt</a><a href="/impressum/">Impressum</a><a href="/datenschutz/">Datenschutz</a><button class="footer-link-button" id="deleteAccountButton" type="button" hidden>Account löschen</button></div>
       <span class="copyright">© 2026 wasgeht · Erfurt, Thüringen</span>
     </div>
+    <nav class="wrap footer-seo" aria-label="Events in Erfurt"><a href="/erfurt/heute/">Heute in Erfurt</a><a href="/erfurt/wochenende/">Wochenende</a><a href="/erfurt/diese-woche/">Diese Woche</a><a href="/erfurt/rave/">Partys &amp; Raves</a><a href="/erfurt/konzerte/">Konzerte</a><a href="/erfurt/szene/">Szene &amp; Nerd</a><a href="/erfurt/ruhig/">Ruhige Events</a><a href="/erfurt/locations/">Clubs &amp; Locations</a></nav>
   </footer>
   <dialog class="app-dialog" id="authDialog" aria-labelledby="authTitle">
     <button class="dialog-close" type="button" data-close-dialog aria-label="Dialog schließen"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 3.5 9 9m0-9-9 9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg></button>

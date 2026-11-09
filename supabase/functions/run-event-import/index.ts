@@ -78,6 +78,36 @@ function streetFromAddress(address) {
   return street && /\d/.test(street) ? street.slice(0, 120) : null;
 }
 
+// Keep in sync with lib/venues.mjs (used by the website build).
+const VENUE_ALIASES = [
+  [/^kalif\s*storch$/i, "Kalif Storch"],
+  [/^(hsd\b.*|haus der sozialen dienste.*)$/i, "HsD – Haus der sozialen Dienste"],
+  [/^((klubhaus\s*)?kickerkeller|klubhaus)$/i, "Klubhaus Kickerkeller"],
+  [/^triebwerk$/i, "Triebwerk"],
+  [/^jederkann$/i, "jederkann"],
+  [/^planet comics caf[eé]( erfurt)?$/i, "Planet Comics Café"],
+  [/^zughafen( erfurt)?$/i, "Zughafen Erfurt"],
+];
+
+function canonicalVenue(name) {
+  const value = String(name ?? "").trim();
+  return VENUE_ALIASES.find(([pattern]) => pattern.test(value))?.[1] || value;
+}
+
+const TITLE_STOPWORDS = new Set(["und", "der", "die", "das", "mit", "von", "the", "and", "feat", "live", "erfurt", "vol", "tour", "party", "konzert"]);
+
+// Share of the shorter title's significant words that also appear in the longer one.
+function titleTokenOverlap(left, right) {
+  const tokens = (value) => new Set(normalizeText(value).split(" ").filter((word) => word.length >= 3 && !TITLE_STOPWORDS.has(word)));
+  const a = tokens(left);
+  const b = tokens(right);
+  if (!a.size || !b.size) return 0;
+  const [shorter, longer] = a.size <= b.size ? [a, b] : [b, a];
+  let hits = 0;
+  for (const word of shorter) if (longer.has(word)) hits += 1;
+  return hits / shorter.size;
+}
+
 function isClosureNotice(title = "") {
   return /^(geschlossen|closed)\b|\bgeschlossen\s*[•|/-]\s*closed\b/i.test(String(title).trim());
 }
@@ -263,6 +293,17 @@ function isDuplicate(existing, candidate) {
   const placeMatchesOrIsUnknown = !existing.location_name && !existing.venue
     || !candidate.location_name
     || placeScore >= 0.45;
+  // Same venue, (almost) same start, same core title words: e.g. "Don Pablo Mulemba – Hundeheimat"
+  // vs. "Don Pablo Mulemba: Hundeheimat – Der Osten, meine Familie …".
+  const existingStart = new Date(existing.start_datetime || existing.starts_at || 0).getTime();
+  const candidateStart = new Date(candidate.start_datetime || 0).getTime();
+  const sameVenue = normalizeText(canonicalVenue(existing.venue || existing.location_name))
+    === normalizeText(canonicalVenue(candidate.venue || candidate.location_name));
+  const nearlySameStart = Boolean(existingStart && candidateStart && Math.abs(existingStart - candidateStart) <= 90 * 60 * 1000);
+  // "2. Show" on the same evening is a separate performance, not a duplicate.
+  const showNumber = (title) => String(title || "").match(/\b(\d+)\.\s*(show|vorstellung)\b/i)?.[1] || "1";
+  const sameShow = showNumber(existing.title) === showNumber(candidate.title);
+  if (sameVenue && nearlySameStart && sameShow && titleTokenOverlap(existing.title, candidate.title) >= 0.75) return true;
   return Boolean(sameSource && titleScore >= 0.6)
     || Boolean(sameDate && titleScore >= 0.9 && placeMatchesOrIsUnknown)
     || Boolean(rangesOverlap && titleScore >= 0.9 && placeMatchesOrIsUnknown);
@@ -1486,7 +1527,7 @@ function normalizeEvent(parsed, candidate, city) {
     start_datetime: start,
     end_datetime: end,
     city: typeof parsed.city === "string" && parsed.city.trim() ? parsed.city.trim().slice(0, 120) : city,
-    location_name: location || null,
+    location_name: location ? canonicalVenue(location) : null,
     address: addressValue ? addressValue.slice(0, 240) : null,
     price: typeof parsed.price === "string" ? parsed.price.trim().slice(0, 50) : null,
     source_url: candidate.source_url || null,
@@ -1500,7 +1541,7 @@ function normalizeEvent(parsed, candidate, city) {
     ...content,
     genre: NERD_TITLE_PATTERN.test(title) ? "szene" : legacyGenre(category),
     status: needsReview ? "needs_review" : "published",
-    venue: location || "Ort noch offen",
+    venue: canonicalVenue(location) || "Ort noch offen",
     starts_at: start,
     date_group: "all",
     place: "city",

@@ -274,12 +274,7 @@ function renderEvents() {
       posterType.style.fontSize = `${fontSize}px`;
     }
   });
-  grid.querySelectorAll(".event-poster-image").forEach((image) => {
-    image.addEventListener("error", () => {
-      image.closest(".event-poster").classList.remove("has-image");
-      image.remove();
-    }, { once: true });
-  });
+  // Broken event images fall back to the text poster via site.js (document-level listener).
   observeRevealElements(grid);
 }
 
