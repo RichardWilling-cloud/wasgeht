@@ -815,6 +815,13 @@ async function handleReviewAction(action, eventId) {
     return;
   }
 
+  if (action === "approve" && !(data.starts_at || data.start_datetime)) {
+    // Never publish an event without a date; let the admin add it first.
+    showToast("Dieses Event hat noch kein Datum – bitte im Editor ergänzen.");
+    openEventEditor(data);
+    return;
+  }
+
   if (action === "approve") {
     const { error: updateError } = await supabaseClient
       .from("events")
