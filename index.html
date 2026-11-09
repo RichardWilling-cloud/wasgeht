@@ -274,6 +274,10 @@
     .filter-label { padding: 0 9px 0 3px; color: var(--filter-label); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
     .filter-control { min-width: 134px; padding: 10px 31px 10px 14px; border: 1px solid rgba(126,107,132,.2); border-radius: 999px; background-color: var(--control-glass); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%237d7080' stroke-linecap='round' stroke-width='1.5'/%3E%3C/svg%3E"); background-position: right 12px center; background-repeat: no-repeat; appearance: none; -webkit-appearance: none; font-size: 12px; font-weight: 700; }
     .filter-control:focus { outline: 1px solid var(--blue); }
+    .date-range { display: flex; align-items: center; gap: 7px; }
+    .date-range[hidden] { display: none; }
+    .date-input { width: 138px; padding: 10px 12px; border: 1px solid rgba(126,107,132,.2); border-radius: 999px; background: var(--control-glass); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; }
+    .date-range-separator { color: var(--muted); font-size: 11px; font-weight: 800; }
     .search-control { width: 170px; padding: 10px 14px; border: 1px solid rgba(126,107,132,.2); border-radius: 999px; background: var(--control-glass); font-size: 12px; }
     .surprise { flex: 0 0 auto; padding: 12px 18px; border: 1px solid var(--ink); background: var(--ink); color: white; font-size: 11px; font-weight: 800; transition: color .2s, background .2s; }
     .surprise:hover { background: var(--acid); color: var(--ink); }
@@ -284,6 +288,9 @@
     .surprise-link .star-mark { display: inline-block; width: 1em; height: 1em; margin-left: .2em; vertical-align: -.15em; }
     .surprise-link:hover { color: var(--ink); background: var(--surprise-hover); }
     .event-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; }
+    .load-more { display: flex; justify-content: center; padding: 24px 0 8px; }
+    .load-more[hidden] { display: none; }
+    .load-more button { min-width: 170px; }
     .event-card { min-width: 0; border: 1px solid var(--line); background: #f8f6f0; transition: transform .2s, border-color .2s; }
     .event-card:hover { transform: translateY(-4px); border-color: var(--ink); }
     .event-poster { position: relative; display: flex; height: 202px; overflow: hidden; align-items: center; justify-content: center; }
@@ -901,7 +908,13 @@
             <option value="today">Heute</option>
             <option value="weekend">Dieses Wochenende</option>
             <option value="week">Diese Woche</option>
+            <option value="custom">Bestimmtes Datum / Zeitraum</option>
           </select>
+          <div class="date-range" id="dateRange" hidden>
+            <input class="date-input" id="dateStart" type="date" aria-label="Startdatum">
+            <span class="date-range-separator" aria-hidden="true">bis</span>
+            <input class="date-input" id="dateEnd" type="date" aria-label="Enddatum">
+          </div>
           <select class="filter-control" id="placeFilter" aria-label="Nach Ort filtern">
             <option value="all">Wo?</option>
             <option value="city">Erfurt</option>
@@ -918,6 +931,9 @@
         <span id="resultsCount">8 Veranstaltungen</span>
       </div>
       <div class="event-grid" id="eventGrid"></div>
+      <div class="load-more" id="loadMoreEvents" hidden>
+        <button class="surprise surprise-link" id="loadMoreButton" type="button">Mehr anzeigen</button>
+      </div>
     </section>
 
     <section class="wrap events organizer-section" id="veranstalter">
@@ -1080,10 +1096,15 @@
     let signedInUser = null;
     let signedInRole = null;
     const grid = document.getElementById("eventGrid");
+    const loadMoreEvents = document.getElementById("loadMoreEvents");
+    const loadMoreButton = document.getElementById("loadMoreButton");
     const count = document.getElementById("resultsCount");
     const search = document.getElementById("searchFilter");
     const genreFilter = document.getElementById("genreFilter");
     const dateFilter = document.getElementById("dateFilter");
+    const dateRange = document.getElementById("dateRange");
+    const dateStart = document.getElementById("dateStart");
+    const dateEnd = document.getElementById("dateEnd");
     const placeFilter = document.getElementById("placeFilter");
     const toast = document.getElementById("toast");
     const themeToggle = document.getElementById("themeToggle");
@@ -1112,6 +1133,8 @@
     let pauseImportAfterBatch = false;
     let continueImportAutomatically = false;
     let importRetriesWithoutProgress = 0;
+    const eventsPerPage = 12;
+    let visibleEventLimit = eventsPerPage;
 
     function observeRevealElements(root = document) {
       const selector = root === document
@@ -1214,24 +1237,34 @@
 
     function renderEvents() {
       const query = search.value.trim().toLocaleLowerCase("de");
+      const customDateStart = dateStart.value;
+      const customDateEnd = dateEnd.value || customDateStart;
+      const hasCustomDateRange = dateFilter.value === "custom" && /^\d{4}-\d{2}-\d{2}$/.test(customDateStart);
       const filtered = events.filter((event) =>
         (event.status || "published") === "published"
         && (event.is_public === true || (!supabaseClient && event.is_public == null))
       ).filter((event) => {
         const matchesGenre = genreFilter.value === "all" || event.genre === genreFilter.value;
-        const matchesDate = dateFilter.value === "all" || event.dateGroup === dateFilter.value;
+        const eventDate = event.starts_at || event.start_datetime;
+        const eventDateKey = eventDate ? new Date(eventDate).toLocaleDateString("sv-SE") : "";
+        const matchesQuickDate = dateFilter.value === "all" || dateFilter.value === "custom" || event.dateGroup === dateFilter.value;
+        const matchesCustomDate = !hasCustomDateRange || (eventDateKey >= customDateStart && eventDateKey <= customDateEnd);
         const matchesPlace = placeFilter.value === "all" || event.place === placeFilter.value;
         const matchesQuery = !query || `${event.title} ${event.type} ${event.venue}`.toLocaleLowerCase("de").includes(query);
-        return matchesGenre && matchesDate && matchesPlace && matchesQuery;
+        return matchesGenre && matchesQuickDate && matchesCustomDate && matchesPlace && matchesQuery;
       }).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-      count.textContent = `${filtered.length} ${filtered.length === 1 ? "Veranstaltung" : "Veranstaltungen"}`;
+      const visible = filtered.slice(0, visibleEventLimit);
+      count.textContent = filtered.length > visible.length
+        ? `${visible.length} von ${filtered.length} Veranstaltungen`
+        : `${filtered.length} ${filtered.length === 1 ? "Veranstaltung" : "Veranstaltungen"}`;
       if (!filtered.length) {
         grid.innerHTML = '<div class="empty-state"><strong>Hier ist gerade noch Platz.</strong>Probier einen anderen Filter oder such nach etwas anderem.</div>';
+        loadMoreEvents.hidden = true;
         return;
       }
 
-      grid.innerHTML = filtered.map((event) => {
+      grid.innerHTML = visible.map((event) => {
         const imageUrl = normalizeImageUrl(event.image_url, event.source_url || window.location.href);
         return `
           <article class="event-card" tabindex="0" role="button" data-event-id="${escapeHTML(event.id || "")}" aria-label="${escapeHTML(event.title)} öffnen">
@@ -1248,6 +1281,7 @@
             </div>
           </article>`;
       }).join("");
+      loadMoreEvents.hidden = visible.length >= filtered.length;
       grid.querySelectorAll(".poster-type").forEach((posterType) => {
         let fontSize = Number.parseFloat(getComputedStyle(posterType).fontSize);
         while (posterType.scrollWidth > posterType.clientWidth + 1 && fontSize > 14) {
@@ -1984,8 +2018,27 @@
       });
     });
 
-    [genreFilter, dateFilter, placeFilter].forEach((control) => control.addEventListener("change", renderEvents));
-    search.addEventListener("input", renderEvents);
+    dateFilter.addEventListener("change", () => {
+      dateRange.hidden = dateFilter.value !== "custom";
+      if (dateFilter.value !== "custom") {
+        dateStart.value = "";
+        dateEnd.value = "";
+      }
+      visibleEventLimit = eventsPerPage;
+      renderEvents();
+    });
+    [genreFilter, placeFilter, dateStart, dateEnd].forEach((control) => control.addEventListener("change", () => {
+      visibleEventLimit = eventsPerPage;
+      renderEvents();
+    }));
+    search.addEventListener("input", () => {
+      visibleEventLimit = eventsPerPage;
+      renderEvents();
+    });
+    loadMoreButton.addEventListener("click", () => {
+      visibleEventLimit += eventsPerPage;
+      renderEvents();
+    });
     document.getElementById("searchButton").addEventListener("click", () => {
       renderEvents();
       grid.scrollIntoView({ behavior: "smooth", block: "start" });

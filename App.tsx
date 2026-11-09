@@ -98,7 +98,10 @@ export default function App() {
   const [genre, setGenre] = useState<Genre>("all");
   const [query, setQuery] = useState("");
   const [place, setPlace] = useState<"all" | "city" | "nearby">("all");
-  const [dateGroup, setDateGroup] = useState<"all" | "today" | "weekend" | "week">("all");
+  const [dateGroup, setDateGroup] = useState<"all" | "today" | "weekend" | "week" | "custom">("all");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
+  const [visibleEventLimit, setVisibleEventLimit] = useState(12);
   const [selected, setSelected] = useState<EventRecord | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [organizerOpen, setOrganizerOpen] = useState(false);
@@ -162,11 +165,25 @@ export default function App() {
     return events.filter((event) => {
       const matchesGenre = genre === "all" || event.genre === genre;
       const matchesPlace = place === "all" || event.place === place;
-      const matchesDate = dateGroup === "all" || event.date_group === dateGroup;
+      const eventDate = new Date(event.starts_at);
+      const eventDateKey = Number.isNaN(eventDate.getTime()) ? "" : [
+        eventDate.getFullYear(),
+        String(eventDate.getMonth() + 1).padStart(2, "0"),
+        String(eventDate.getDate()).padStart(2, "0"),
+      ].join("-");
+      const customEnd = dateEnd || dateStart;
+      const hasCustomDateRange = /^\d{4}-\d{2}-\d{2}$/.test(dateStart);
+      const matchesQuickDate = dateGroup === "all" || dateGroup === "custom" || !hasCustomDateRange && event.date_group === dateGroup;
+      const matchesCustomDate = !hasCustomDateRange || eventDateKey >= dateStart && eventDateKey <= customEnd;
       const matchesQuery = !normalized || `${event.title} ${event.type} ${event.venue}`.toLocaleLowerCase("de").includes(normalized);
-      return matchesGenre && matchesPlace && matchesDate && matchesQuery;
+      return matchesGenre && matchesPlace && matchesQuickDate && matchesCustomDate && matchesQuery;
     }).sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
-  }, [dateGroup, events, genre, place, query]);
+  }, [dateEnd, dateGroup, dateStart, events, genre, place, query]);
+  const visibleEvents = filteredEvents.slice(0, visibleEventLimit);
+
+  useEffect(() => {
+    setVisibleEventLimit(12);
+  }, [dateGroup, genre, place, query]);
 
   const surprise = () => {
     if (!filteredEvents.length) {
@@ -272,7 +289,7 @@ export default function App() {
         </View>
       </View>
       <FlatList
-        data={filteredEvents}
+        data={visibleEvents}
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.gridRow}
@@ -289,14 +306,20 @@ export default function App() {
               <Pressable onPress={() => setPlace(place === "nearby" ? "all" : "nearby")} style={[styles.chip, place === "nearby" && styles.chipActive]}><Text style={styles.chipText}>Umgebung</Text></Pressable>
             </ScrollView>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {([["all", "Alle Tage"], ["today", "Heute"], ["weekend", "Dieses Wochenende"], ["week", "Diese Woche"]] as const).map(([value, label]) => <Pressable key={value} onPress={() => setDateGroup(value)} style={[styles.chip, dateGroup === value && styles.chipActive]}><Text style={styles.chipText}>{label}</Text></Pressable>)}
+              {([["all", "Alle Tage"], ["today", "Heute"], ["weekend", "Dieses Wochenende"], ["week", "Diese Woche"]] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setDateGroup(value); setDateStart(""); setDateEnd(""); }} style={[styles.chip, dateGroup === value && styles.chipActive]}><Text style={styles.chipText}>{label}</Text></Pressable>)}
+              <Pressable onPress={() => setDateGroup("custom")} style={[styles.chip, dateGroup === "custom" && styles.chipActive]}><Text style={styles.chipText}>Datum / Zeitraum</Text></Pressable>
               <Pressable onPress={surprise} style={styles.surpriseChip}><Text style={styles.chipText}>Überrasche mich ↗</Text></Pressable>
             </ScrollView>
-            <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{filteredEvents.length} Veranstaltungen</Text><Text style={styles.city}>Erfurt</Text></View>
+            {dateGroup === "custom" && <View style={styles.dateRange}>
+              <TextInput value={dateStart} onChangeText={setDateStart} placeholder="Start: JJJJ-MM-TT" placeholderTextColor={colors.muted} style={[styles.input, styles.dateInput]} keyboardType="numbers-and-punctuation" />
+              <TextInput value={dateEnd} onChangeText={setDateEnd} placeholder="Ende (optional)" placeholderTextColor={colors.muted} style={[styles.input, styles.dateInput]} keyboardType="numbers-and-punctuation" />
+            </View>}
+            <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{filteredEvents.length > visibleEvents.length ? `${visibleEvents.length} von ${filteredEvents.length}` : filteredEvents.length} Veranstaltungen</Text><Text style={styles.city}>Erfurt</Text></View>
           </View>
         }
         renderItem={({ item }) => <EventCard event={item} onPress={() => setSelected(item)} />}
         ListEmptyComponent={<Text style={styles.empty}>Keine passenden Events gefunden.</Text>}
+        ListFooterComponent={visibleEvents.length < filteredEvents.length ? <View style={styles.loadMore}><Button label="Mehr anzeigen" secondary onPress={() => setVisibleEventLimit((limit) => limit + 12)} /></View> : null}
       />
       <View style={styles.organizerBar}>
         <View style={styles.organizerCopy}><Text style={styles.organizerTitle}>Dein Event. Deine Leute.</Text><Text style={styles.organizerText}>Reiche dein Event direkt in der App ein.</Text></View>
@@ -375,6 +398,7 @@ const styles = StyleSheet.create({
   cardMeta: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 7 },
   price: { color: colors.accent, fontSize: 11, fontWeight: "800", marginTop: 8 },
   empty: { color: colors.muted, paddingVertical: 40, textAlign: "center" },
+  loadMore: { alignItems: "center", paddingVertical: 18 },
   organizerBar: { position: "absolute", left: 12, right: 12, bottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, backgroundColor: "rgba(61,56,65,.96)", borderColor: colors.border, borderWidth: 1, borderRadius: 22, padding: 14 },
   organizerCopy: { flex: 1 },
   organizerTitle: { color: colors.ink, fontSize: 14, fontWeight: "800" },
@@ -391,6 +415,8 @@ const styles = StyleSheet.create({
   modalMeta: { color: colors.muted, fontSize: 13, lineHeight: 20, marginBottom: 16 },
   description: { color: colors.ink, fontSize: 14, lineHeight: 22, marginBottom: 22 },
   input: { color: colors.ink, backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 11 },
+  dateRange: { flexDirection: "row", gap: 8, marginBottom: 5 },
+  dateInput: { flex: 1, minWidth: 0 },
   message: { color: colors.pink, fontSize: 12, lineHeight: 18, marginBottom: 12 },
   adminRow: { flexDirection: "row", alignItems: "center", gap: 10, borderColor: colors.border, borderBottomWidth: 1, paddingVertical: 12 },
   adminTitle: { color: colors.ink, fontSize: 14, fontWeight: "800" }

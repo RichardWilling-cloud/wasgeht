@@ -447,6 +447,57 @@ function candidateFromEventCard(cardHtml, source) {
   };
 }
 
+function klanggeruestCandidates(html, source) {
+  const germanMonths = new Map([
+    ["januar", 1], ["februar", 2], ["märz", 3], ["maerz", 3],
+    ["april", 4], ["mai", 5], ["juni", 6], ["juli", 7],
+    ["august", 8], ["september", 9], ["oktober", 10],
+    ["november", 11], ["dezember", 12],
+  ]);
+  const candidates = [];
+
+  for (const block of extractHtmlBlocks(html, (tagName) => tagName === "event")) {
+    const title = cleanHtml(
+      block.html.match(/<h[1-6]\b[^>]*class=["'][^"']*\bevent-title\b[^"']*["'][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1] || "",
+    );
+    const dateText = cleanHtml(
+      block.html.match(/<p\b[^>]*class=["'][^"']*\bevent-date\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i)?.[1] || "",
+    );
+    const dateMatch = dateText.match(
+      /(?:\w+,\s*)?(\d{1,2})\.\s*([A-Za-zÄÖÜäöüß]+)\s+(\d{4})(?:,\s*(\d{1,2}):(\d{2})\s*Uhr)?/i,
+    );
+    if (!title || !dateMatch) continue;
+
+    const [, dayText, monthText, yearText, hourText = "20", minuteText = "00"] = dateMatch;
+    const month = germanMonths.get(monthText.toLocaleLowerCase("de-DE"));
+    if (!month) continue;
+    const startDate = dateTimeInBerlin(
+      `${String(Number(dayText)).padStart(2, "0")}.${String(month).padStart(2, "0")}.${yearText}`,
+      `${String(Number(hourText)).padStart(2, "0")}:${minuteText}`,
+    );
+    if (!startDate) continue;
+
+    const link = block.html.match(/<a\b[^>]*href=["']([^"']+)["'][^>]*>/i)?.[1];
+    const description = cleanHtml(block.html.match(/<div\b[^>]*class=["'][^"']*\btext\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1] || "");
+    candidates.push({
+      raw_text: `${title}\n${dateText}\n${description}`.slice(0, 5000),
+      title,
+      description: description || null,
+      start_datetime: startDate,
+      end_datetime: null,
+      city: "Erfurt",
+      location_name: "Klanggerüst",
+      address: null,
+      source_url: link ? new URL(link.replace(/&amp;/g, "&"), source.url).toString() : source.url,
+      image_url: imageFromEventCard(block.html, source.url),
+      source_type: "website",
+      source_name: source.source_name,
+    });
+  }
+
+  return candidates.slice(0, 25);
+}
+
 function decodeNuxtPayload(payload) {
   const cache = new Map();
   const resolve = (index, depth = 0) => {
@@ -905,6 +956,8 @@ async function fetchWebsiteCandidates(source) {
     candidates = frauKorteCandidates(html, source);
   } else if (url.hostname.endsWith("retronom.net")) {
     candidates = retronomCandidates(html, source);
+  } else if (url.hostname === "klanggeruest.de") {
+    candidates = klanggeruestCandidates(html, source);
   } else if (url.hostname === "cafe-kunst-bar.com" && /<ul\b[^>]*class=["'][^"']*\bevents\b[^"']*\bdiary\b[^"']*\bfuture\b/i.test(html)) {
     candidates = structuredEventsFromHtml(html, source);
     if (!candidates.length) return [];
