@@ -622,7 +622,6 @@
     @media (max-width: 640px) {
       .wrap { width: min(100% - 34px, 480px); }
       .topline { font-size: 9px; }
-      #dataModeLabel { display: none; }
       .site-version { font-size: 8px; }
       .nav { min-height: 65px; }
       .nav-links, a.submit-link { display: none; }
@@ -714,7 +713,6 @@
   <div class="topline">
     <div class="wrap">
       <span><i class="live-dot"></i>Deine Events, endlich an einem Ort</span>
-      <span id="dataModeLabel">Erfurt &amp; Umgebung · Vorschau</span>
       <span class="site-version" id="siteVersionLabel" title="Website-Version wird geladen">Version wird geladen</span>
     </div>
   </div>
@@ -1197,7 +1195,6 @@
 
     async function loadEventsFromSupabase() {
       if (!supabaseClient) {
-        document.getElementById("dataModeLabel").textContent = "Erfurt & Umgebung · Vorschau";
         renderEvents();
         return;
       }
@@ -1207,12 +1204,10 @@
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) {
-        document.getElementById("dataModeLabel").textContent = "Supabase-Verbindung prüfen";
         showToast(`Events konnten nicht geladen werden: ${error.message}`);
         grid.innerHTML = '<div class="empty-state"><strong>Events gerade nicht erreichbar.</strong>Bitte versuche es später erneut.</div>';
         return;
       }
-      document.getElementById("dataModeLabel").textContent = "Erfurt & Umgebung · Live";
       events = data.map((record) => ({
         id: record.id,
         title: record.title,
