@@ -1416,6 +1416,11 @@ async function extractEvent(candidate, city, now) {
   return JSON.parse(content);
 }
 
+// Games, tabletop, cosplay & co. always belong to "Szene & Nerd", whatever category the
+// model picked (it tends to file card-game tournaments under Community/Workshop).
+// Title only: venue names such as "Planet Comics Café" must not reclassify craft workshops.
+const NERD_TITLE_PATTERN = /yu-?gi-?oh|magic[: ]+the gathering|\bmtg\b|commander night|pok[eé]mon|riftbound|lorcana|one piece card|flesh and blood|star wars unlimited|digimon|warhammer|tabletop|brettspiel|pen ?(&|and|und) ?paper|dungeons|\bd ?& ?d\b|\bdnd\b|rollenspiel|\blarp\b|cosplay|\banime|\bmanga|\bcomics?\b|\bgaming\b|e-?sport|lan[- ]party|trading ?card|sammelkarten|prerelease/i;
+
 function legacyGenre(category = "") {
   const value = normalizeText(category);
   if (["rave", "party", "club"].some((word) => value.includes(word))) return "party";
@@ -1493,7 +1498,7 @@ function normalizeEvent(parsed, candidate, city) {
   const needsReview = !title || !start || !location || confidence < 0.6;
   return {
     ...content,
-    genre: legacyGenre(category),
+    genre: NERD_TITLE_PATTERN.test(title) ? "szene" : legacyGenre(category),
     status: needsReview ? "needs_review" : "published",
     venue: location || "Ort noch offen",
     starts_at: start,
