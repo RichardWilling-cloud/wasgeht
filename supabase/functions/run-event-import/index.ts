@@ -1315,7 +1315,7 @@ function normalizeEvent(parsed, candidate, city) {
     type: category || "Event",
     price_for_display: content.price || "Preis unbekannt",
     poster: 1,
-    art: title,
+    art: title.slice(0, 100), // events.art allows at most 100 characters
     is_public: !needsReview,
   };
 }
