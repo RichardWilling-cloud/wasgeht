@@ -1311,6 +1311,32 @@ document.getElementById("trackingOptOut").addEventListener("change", (event) => 
   showToast(event.target.checked ? "Dieses Gerät wird nicht mitgezählt." : "Dieses Gerät wird wieder mitgezählt.");
 });
 suggestionForm.addEventListener("submit", submitSuggestion);
+// Header shortcuts: jump to the event finder and preset the filters instead of
+// leaving the designed homepage. "#wochenende" also works as a shareable link.
+function applyQuickFilter(dateValue, { scroll = true } = {}) {
+  genreFilter.value = "all";
+  placeFilter.value = "all";
+  search.value = "";
+  dateFilter.value = dateValue;
+  dateRange.hidden = true;
+  dateStart.value = "";
+  dateEnd.value = "";
+  visibleEventLimit = eventsPerPage;
+  renderEvents();
+  if (dateValue !== "all") track("filter", { filter_name: "date", filter_value: dateValue });
+  if (scroll) document.getElementById("events").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+}
+document.querySelectorAll("[data-quick-filter]").forEach((link) => link.addEventListener("click", (event) => {
+  event.preventDefault();
+  const dateValue = link.dataset.quickFilter === "weekend" ? "weekend" : "all";
+  history.replaceState(null, "", dateValue === "weekend" ? "#wochenende" : "#events");
+  applyQuickFilter(dateValue);
+}));
+if (window.location.hash === "#wochenende") {
+  dateFilter.value = "weekend";
+  requestAnimationFrame(() => document.getElementById("events").scrollIntoView({ block: "start" }));
+}
+
 observeRevealElements();
 void loadPublicEvents();
 if (hasStoredSession() || hasAuthRedirect()) void ensureSupabase().catch(() => {});
