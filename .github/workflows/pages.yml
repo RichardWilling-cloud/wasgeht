@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 22
       - name: Run unit tests
-        run: node --test tests/
+        run: node --test tests/*.test.js
       - name: Build website (static files, SEO event pages, sitemap)
         env:
           SUPABASE_URL: https://zvhvofgpizwhtxmcnghm.supabase.co
