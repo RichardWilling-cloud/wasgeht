@@ -1540,7 +1540,7 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
     }
 
     if (!dryRun) {
-      const { data: archived } = await supabaseRequest("rpc/archive_expired_events", accessToken, {
+      const { data: archived } = await supabaseRequest("rpc/archive_expired_events_internal", accessToken, {
         method: "POST",
         body: JSON.stringify({}),
       });
@@ -1624,7 +1624,11 @@ Deno.serve(async (request) => {
   const isCronRequest = Boolean(CRON_IMPORT_SECRET
     && request.headers.get("x-cron-secret")
     && request.headers.get("x-cron-secret") === CRON_IMPORT_SECRET);
-  if (!isCronRequest) {
+  const isServiceRequest = Boolean(
+    SUPABASE_SERVICE_ROLE_KEY
+    && authorization === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  );
+  if (!isCronRequest && !isServiceRequest) {
     if (!authorization?.startsWith("Bearer ")) return response({ error: "Authentication required" }, 401);
     try {
       if (!await verifyAdmin(authorization)) return response({ error: "Admin access required" }, 403);
@@ -1655,7 +1659,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const accessToken = isCronRequest
+    const accessToken = isCronRequest || isServiceRequest
       ? `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
       : authorization;
     const result = payload.fullRun

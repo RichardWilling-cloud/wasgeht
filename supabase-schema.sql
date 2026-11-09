@@ -472,7 +472,7 @@ begin
     url := 'https://zvhvofgpizwhtxmcnghm.supabase.co/functions/v1/run-event-import',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-cron-secret', cron_secret
+      'X-Cron-Secret', cron_secret
     ),
     body := '{"city":"Erfurt","fullRun":true}'::jsonb
   )
