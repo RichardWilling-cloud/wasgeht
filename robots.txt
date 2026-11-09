@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /login
-
-Sitemap: https://wasgeht-ab.de/sitemap.xml

@@ -529,3 +529,9 @@ begin
   );
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Sicherheits- und Datenschutz-Update November 2026:
+-- siehe supabase/2026-11-security-privacy.sql (Account-Selbstlöschung,
+-- einmalige Vorschlags-Benachrichtigung, Limit für private Event-Einreichungen).
+-- Für ein neues Projekt dieses Script direkt im Anschluss ausführen.

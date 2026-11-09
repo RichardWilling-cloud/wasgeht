@@ -9,10 +9,13 @@ const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-6-luna";
 const GOOGLE_SEARCH_API_KEY = Deno.env.get("GOOGLE_SEARCH_API_KEY");
 const IMPORT_BATCH_SIZE = 8;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+const ALLOWED_ORIGINS = ["https://wasgeht-ab.de", "https://www.wasgeht-ab.de", "http://localhost:8000"];
+// Set per request in Deno.serve; the import is only triggered from the website or by cron.
+let corsHeaders = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0],
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  Vary: "Origin",
 };
 
 function response(body, status = 200) {
@@ -20,6 +23,17 @@ function response(body, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Constant-time comparison so the cron secret cannot be guessed via response timing.
+function secretsMatch(provided, expected) {
+  if (typeof provided !== "string" || typeof expected !== "string" || !expected) return false;
+  const encoder = new TextEncoder();
+  const left = encoder.encode(provided);
+  const right = encoder.encode(expected);
+  let difference = left.length ^ right.length;
+  for (let index = 0; index < right.length; index += 1) difference |= (left[index] ?? 0) ^ right[index];
+  return difference === 0;
 }
 
 function normalizeText(value = "") {
@@ -1589,31 +1603,35 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
   }
 }
 
-async function processFullImport({ city, accessToken }) {
-  const aggregate = { new: 0, updated: 0, unchanged: 0, archived: 0, needs_review: 0, errors: [], warnings: [] };
-  let batchOffset = 0;
-  for (let batch = 0; batch < 50; batch += 1) {
-    const result = await processImport({
-      city,
-      dryRun: false,
-      maxEvents: IMPORT_BATCH_SIZE,
-      batchOffset,
-      accessToken,
-    });
-    for (const key of ["new", "updated", "unchanged", "archived", "needs_review"]) {
-      aggregate[key] += Number(result[key]) || 0;
-    }
-    aggregate.errors.push(...(result.errors || []));
-    aggregate.warnings.push(...(result.warnings || []));
-    if (!result.has_more || result.next_batch_offset <= batchOffset) {
-      return { ...result, ...aggregate, batches: batch + 1, full_run: true };
-    }
-    batchOffset = result.next_batch_offset;
+const MAX_CHAINED_BATCHES = 60;
+
+// Full (cron) runs are processed as a chain: every invocation handles exactly one batch
+// and then triggers the next one. A single invocation for all batches exceeded the
+// Edge Function wall-clock limit and was silently killed after ~2-3 batches.
+async function processChainedFullImport({ city, accessToken, batchOffset, chainIndex }) {
+  const result = await processImport({ city, dryRun: false, maxEvents: IMPORT_BATCH_SIZE, batchOffset, accessToken });
+  const nextOffset = Number(result.next_batch_offset) || 0;
+  const continues = result.has_more === true && nextOffset > batchOffset && chainIndex + 1 < MAX_CHAINED_BATCHES;
+  if (continues) {
+    // Fire and forget: the next invocation keeps running after this request is aborted.
+    const next = fetchWithTimeout(`${SUPABASE_URL}/functions/v1/run-event-import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Cron-Secret": CRON_IMPORT_SECRET },
+      body: JSON.stringify({ city, fullRun: true, batchOffset: nextOffset, chainIndex: chainIndex + 1 }),
+    }, 4000).catch(() => {});
+    // deno-lint-ignore no-explicit-any
+    const runtime = (globalThis as any).EdgeRuntime;
+    if (runtime?.waitUntil) runtime.waitUntil(next);
+    else await next;
+  } else if (result.has_more) {
+    console.warn(`Full import stopped at offset ${nextOffset} (chain ${chainIndex}); rate limit or chain limit reached.`);
   }
-  throw new Error("Daily import exceeded the maximum batch count");
+  return { ...result, full_run: true, chain_index: chainIndex, continues };
 }
 
 Deno.serve(async (request) => {
+  const origin = request.headers.get("Origin") || "";
+  corsHeaders = { ...corsHeaders, "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] };
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -1621,9 +1639,7 @@ Deno.serve(async (request) => {
   if (!SUPABASE_URL || !SUPABASE_KEY) return response({ error: "Supabase runtime configuration is incomplete" }, 500);
 
   const authorization = request.headers.get("Authorization");
-  const isCronRequest = Boolean(CRON_IMPORT_SECRET
-    && request.headers.get("x-cron-secret")
-    && request.headers.get("x-cron-secret") === CRON_IMPORT_SECRET);
+  const isCronRequest = secretsMatch(request.headers.get("x-cron-secret"), CRON_IMPORT_SECRET);
   const isServiceRequest = Boolean(
     SUPABASE_SERVICE_ROLE_KEY
     && authorization === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
@@ -1662,8 +1678,15 @@ Deno.serve(async (request) => {
     const accessToken = isCronRequest || isServiceRequest
       ? `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
       : authorization;
+    if (payload.fullRun && !isCronRequest && !isServiceRequest) {
+      return response({ error: "fullRun is only available for scheduled imports" }, 403);
+    }
+    const chainIndex = Number(payload.chainIndex ?? 0);
+    if (!Number.isInteger(chainIndex) || chainIndex < 0 || chainIndex >= MAX_CHAINED_BATCHES) {
+      return response({ error: "chainIndex is out of range" }, 400);
+    }
     const result = payload.fullRun
-      ? await processFullImport({ city, accessToken })
+      ? await processChainedFullImport({ city, accessToken, batchOffset, chainIndex })
       : await processImport({
           city,
           dryRun: payload.dryRun === true,

@@ -1,4 +1,13 @@
 project_id = "zvhvofgpizwhtxmcnghm"
 
+# The import authenticates itself (admin JWT, cron secret or service key).
+# The gateway JWT check must stay off, otherwise the nightly cron and the
+# chained batch calls (which carry only the X-Cron-Secret header) are rejected.
 [functions.run-event-import]
+verify_jwt = false
+
+[functions.notify-event-suggestion]
 verify_jwt = true
+
+[functions.track]
+verify_jwt = false

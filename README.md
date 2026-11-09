@@ -77,7 +77,7 @@ Die `sb_publishable_...`-Kennung in `index.html` ist der öffentliche Supabase-C
 Die Website wird bei jedem Push auf `main` automatisch mit GitHub Actions auf GitHub Pages veröffentlicht.
 In der schmalen Statuszeile am oberen Rand zeigt `Live · Datum · #Laufnummer` die veröffentlichte Website-Version. Der zugehörige Commit ist beim Darüberfahren sichtbar. Eine lokale oder noch nicht veröffentlichte Kopie wird stattdessen als `Lokal · nicht veröffentlicht` markiert.
 
-Der GitHub-Pages-Workflow erzeugt vor jedem Deployment zusätzlich statische SEO-Seiten für alle öffentlichen, veröffentlichten Events unter `/event/.../`. Er läuft automatisch täglich um 03:30 UTC, also nach dem nächtlichen Import und der Archivierung, und aktualisiert dabei auch `sitemap.xml`. Neue Events werden dadurch ohne manuellen Deploy in die Suchmaschinen-Seiten aufgenommen.
+Der GitHub-Pages-Workflow führt vor jedem Deployment die Unit-Tests aus und erzeugt statische SEO-Seiten für alle öffentlichen, veröffentlichten Events unter `/event/.../`. Er läuft automatisch täglich um 03:30 UTC, also nach dem nächtlichen Import und der Archivierung, und aktualisiert dabei auch `sitemap.xml`. Neue Events werden dadurch ohne manuellen Deploy in die Suchmaschinen-Seiten aufgenommen.
 
 Eventvorschläge werden nur von angemeldeten Accounts angenommen, auf fünf Vorschläge je 24 Stunden begrenzt und erst nach Admin-Prüfung veröffentlicht. Für E-Mail-Benachrichtigungen die Function `notify-event-suggestion` mit `RESEND_API_KEY`, `EVENT_SUGGESTION_RECIPIENT` und `EVENT_SUGGESTION_SENDER` als Function Secrets deployen. Die Absenderdomain muss zuvor bei Resend verifiziert werden.
 
@@ -85,11 +85,7 @@ Der Quellenadapter für [Campus Erfurt](https://www.campus-erfurt.de/veranstaltu
 
 Das Repository liegt unter <https://github.com/RichardWilling-cloud/wasgeht>.
 
-1. Im Terminal in den Projektordner wechseln:
-
-   ```sh
-   cd "/Users/richardwilling/.copilot/chats/021713ba-51d7-48e1-88b0-097457016b16"
-   ```
+1. Im Terminal in den Projektordner wechseln.
 
 2. GitHub CLI installieren, falls `gh` noch nicht vorhanden ist. Auf dem Mac mit Homebrew:
 
@@ -136,7 +132,7 @@ In Supabase müssen die Auth-Einstellungen ebenfalls auf diese Adresse umgestell
 3. Unter **Authentication → Email Templates** den Produktnamen in den E-Mail-Vorlagen aktualisieren.
 4. Optional unter **Project Settings → General** den angezeigten Projektnamen auf `wasgeht` ändern. Die Projekt-Referenz und URL in `index.html` nicht ändern: Dafür ist keine Datenbankmigration nötig.
 
-Das SQL-Schema enthält keinen Produktnamen; Accounts, Events und Rollen bleiben im bestehenden Supabase-Projekt erhalten. Der Kontaktlink auf der Website verwendet `hallo@wasgeht.de`; diese Mailbox muss eingerichtet oder im Footer auf eine bereits vorhandene Adresse geändert werden.
+Das SQL-Schema enthält keinen Produktnamen; Accounts, Events und Rollen bleiben im bestehenden Supabase-Projekt erhalten. Der Kontaktlink auf der Website verwendet `waslos@wasgeht-ab.de`.
 
 ## Eigene Domain: wasgeht-ab.de
 
@@ -157,12 +153,26 @@ Die Root-Datei [`CNAME`](./CNAME) hält die gewünschte Domain-Zuordnung für De
 
 Die DNS-Propagation kann je nach Anbieter einige Stunden dauern. Bis dahin bleibt die GitHub-Pages-Adresse verfügbar.
 
+## Website-Build
+
+`scripts/build-site.mjs` baut die veröffentlichte Website nach `_site/`. Nur dort liegende Dateien gehen online – Schema, Edge Functions, App-Quellcode und README werden nicht mehr ausgeliefert. Der Build
+
+- rendert die ersten 12 aktuellen Events direkt in `index.html` (sofort sichtbar und für Suchmaschinen crawlbar, Titel verlinken auf die Eventseiten),
+- erzeugt `/event/<slug>/`, `/erfurt/` und die Genre-/Wochenend-Landingpages,
+- schreibt `sitemap.xml` (mit echtem `lastmod`) und `robots.txt`,
+- bricht ab, solange Impressum oder Datenschutzerklärung noch `[[AUSFÜLLEN …]]`-Platzhalter enthalten.
+
+Die Startseite lädt die Events direkt über die REST-API. Das Supabase-SDK (`vendor/`, selbst gehostet und versioniert) wird erst nachgeladen, wenn jemand angemeldet ist oder sich anmelden möchte. Die Content-Security-Policy steht als `<meta>` in `index.html`. Wird das kleine Inline-Skript im `<head>` geändert, muss dessen SHA-256-Hash in der CSP aktualisiert werden.
+
+Für das SDK-Update: `npm install`, danach `node_modules/@supabase/supabase-js/dist/umd/supabase.js` als `vendor/supabase-js-<version>.js` kopieren und `SUPABASE_SDK_URL` in `app.js` anpassen.
+
 ## Lokal testen
 
-Die Seite sollte über einen lokalen HTTP-Server statt über `file://` geöffnet werden, damit Auth-Weiterleitungen funktionieren. Zum Beispiel:
-
 ```sh
-python3 -m http.server 8000
+ALLOW_PLACEHOLDERS=1 SUPABASE_URL=https://zvhvofgpizwhtxmcnghm.supabase.co \
+  SUPABASE_PUBLISHABLE_KEY=sb_publishable_8tGj45KNbpGERTyOtC2Cfg_IiFh9myI \
+  node scripts/build-site.mjs
+cd _site && python3 -m http.server 8000
 ```
 
 Dann `http://localhost:8000/` im Browser aufrufen und diese Adresse während des lokalen Tests zusätzlich in Supabase als Redirect URL eintragen.
