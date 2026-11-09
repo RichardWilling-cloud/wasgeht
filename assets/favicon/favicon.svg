@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="glowA" cx="20%" cy="15%" r="75%"><stop offset="0" stop-color="#a6587a" stop-opacity=".95"/><stop offset="1" stop-color="#a6587a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="glowB" cx="90%" cy="95%" r="70%"><stop offset="0" stop-color="#705b9d" stop-opacity=".9"/><stop offset="1" stop-color="#705b9d" stop-opacity="0"/></radialGradient>
+    <linearGradient id="disc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d4d1a6"/><stop offset=".55" stop-color="#7ea58f"/><stop offset="1" stop-color="#a3c0a5"/></linearGradient>
+    <radialGradient id="shine" cx="30%" cy="22%" r="40%"><stop offset="0" stop-color="#fff8e6" stop-opacity=".75"/><stop offset="1" stop-color="#fff8e6" stop-opacity="0"/></radialGradient>
+    <linearGradient id="center" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f29ac4"/><stop offset="1" stop-color="#b8588a"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#2d2b30"/>
+  <rect width="512" height="512" rx="112" fill="url(#glowA)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glowB)"/>
+  <circle cx="256" cy="256" r="196" fill="url(#disc)"/>
+  <circle cx="256" cy="256" r="196" fill="url(#shine)"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#ffffff" stroke-opacity=".38" stroke-width="5"/>
+  <circle cx="256" cy="256" r="124" fill="none" stroke="#ffffff" stroke-opacity=".3" stroke-width="5"/>
+  <circle cx="256" cy="256" r="80" fill="url(#center)"/>
+  <path d="M256 210v92M210 256h92M223.5 223.5l65 65M288.5 223.5l-65 65" fill="none" stroke="#fff7fb" stroke-linecap="round" stroke-width="13"/>
+</svg>
