@@ -7,11 +7,6 @@
     "userInterfaceStyle": "automatic",
     "scheme": "wasgeht",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2d2b30"
-    },
     "backgroundColor": "#2d2b30",
     "ios": {
       "supportsTablet": true,
@@ -25,7 +20,17 @@
         "backgroundColor": "#2d2b30"
       }
     },
-    "plugins": [],
+    "plugins": [
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#2d2b30"
+        }
+      ]
+    ],
     "extra": {}
   }
 }

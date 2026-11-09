@@ -2,6 +2,8 @@
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
   || Deno.env.get("SUPABASE_ANON_KEY");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const CRON_IMPORT_SECRET = Deno.env.get("CRON_IMPORT_SECRET");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-6-luna";
 const GOOGLE_SEARCH_API_KEY = Deno.env.get("GOOGLE_SEARCH_API_KEY");
@@ -1429,6 +1431,30 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
   }
 }
 
+async function processFullImport({ city, accessToken }) {
+  const aggregate = { new: 0, updated: 0, unchanged: 0, archived: 0, needs_review: 0, errors: [], warnings: [] };
+  let batchOffset = 0;
+  for (let batch = 0; batch < 50; batch += 1) {
+    const result = await processImport({
+      city,
+      dryRun: false,
+      maxEvents: IMPORT_BATCH_SIZE,
+      batchOffset,
+      accessToken,
+    });
+    for (const key of ["new", "updated", "unchanged", "archived", "needs_review"]) {
+      aggregate[key] += Number(result[key]) || 0;
+    }
+    aggregate.errors.push(...(result.errors || []));
+    aggregate.warnings.push(...(result.warnings || []));
+    if (!result.has_more || result.next_batch_offset <= batchOffset) {
+      return { ...result, ...aggregate, batches: batch + 1, full_run: true };
+    }
+    batchOffset = result.next_batch_offset;
+  }
+  throw new Error("Daily import exceeded the maximum batch count");
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -1437,12 +1463,19 @@ Deno.serve(async (request) => {
   if (!SUPABASE_URL || !SUPABASE_KEY) return response({ error: "Supabase runtime configuration is incomplete" }, 500);
 
   const authorization = request.headers.get("Authorization");
-  if (!authorization?.startsWith("Bearer ")) return response({ error: "Authentication required" }, 401);
-  try {
-    if (!await verifyAdmin(authorization)) return response({ error: "Admin access required" }, 403);
-  } catch (error) {
-    console.error("Could not verify admin role:", error);
-    return response({ error: "Could not verify admin role" }, 500);
+  const isCronRequest = Boolean(CRON_IMPORT_SECRET
+    && request.headers.get("x-cron-secret")
+    && request.headers.get("x-cron-secret") === CRON_IMPORT_SECRET);
+  if (!isCronRequest) {
+    if (!authorization?.startsWith("Bearer ")) return response({ error: "Authentication required" }, 401);
+    try {
+      if (!await verifyAdmin(authorization)) return response({ error: "Admin access required" }, 403);
+    } catch (error) {
+      console.error("Could not verify admin role:", error);
+      return response({ error: "Could not verify admin role" }, 500);
+    }
+  } else if (!SUPABASE_SERVICE_ROLE_KEY) {
+    return response({ error: "Scheduled import is not configured securely" }, 500);
   }
 
   let payload;
@@ -1464,13 +1497,18 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const result = await processImport({
-      city,
-      dryRun: payload.dryRun === true,
-      maxEvents,
-      batchOffset,
-      accessToken: authorization,
-    });
+    const accessToken = isCronRequest
+      ? `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      : authorization;
+    const result = payload.fullRun
+      ? await processFullImport({ city, accessToken })
+      : await processImport({
+          city,
+          dryRun: payload.dryRun === true,
+          maxEvents,
+          batchOffset,
+          accessToken,
+        });
     return response(result);
   } catch (error) {
     console.error("Event import failed:", error);

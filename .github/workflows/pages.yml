@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: "30 3 * * *"
 
 permissions:
   contents: read
@@ -29,6 +31,15 @@ jobs:
             "$(date -u +%Y.%m.%d)" \
             "$GITHUB_RUN_NUMBER" \
             "$(git rev-parse --short=7 HEAD)" > version.json
+      - name: Generate SEO event pages
+        env:
+          SUPABASE_URL: https://zvhvofgpizwhtxmcnghm.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_8tGj45KNbpGERTyOtC2Cfg_IiFh9myI
+        run: node scripts/generate-event-pages.mjs
+      - name: Assemble website artifact
+        run: |
+          cp -R generated-site/event .
+          cp generated-site/sitemap.xml generated-site/robots.txt .
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:

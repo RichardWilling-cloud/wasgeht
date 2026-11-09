@@ -379,6 +379,48 @@ grant execute on function public.archive_expired_events() to authenticated;
 drop function if exists public.runeventimport(text, boolean, integer);
 
 create extension if not exists pg_cron;
+create extension if not exists pg_net;
+create extension if not exists vault;
+
+create or replace function public.trigger_daily_event_import()
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cron_secret text;
+  request_id bigint;
+begin
+  if extract(hour from (now() at time zone 'Europe/Berlin')) <> 2 then
+    return null;
+  end if;
+
+  select decrypted_secret
+    into cron_secret
+  from vault.decrypted_secrets
+  where name = 'wasgeht-cron-import-secret'
+  limit 1;
+
+  if cron_secret is null then
+    raise exception 'Missing Vault secret: wasgeht-cron-import-secret';
+  end if;
+
+  select net.http_post(
+    url := 'https://zvhvofgpizwhtxmcnghm.supabase.co/functions/v1/run-event-import',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', cron_secret
+    ),
+    body := '{"city":"Erfurt","fullRun":true}'::jsonb
+  )
+    into request_id;
+
+  return request_id;
+end;
+$$;
+
+revoke all on function public.trigger_daily_event_import() from public, anon, authenticated;
 
 do $$
 declare
@@ -394,6 +436,34 @@ begin
     'wasgeht-archive-expired-events',
     '0 3 * * *',
     'select public.archive_expired_events_internal();'
+  );
+end;
+$$;
+
+do $$
+declare
+  existing_job_id bigint;
+begin
+  for existing_job_id in
+    select jobid
+    from cron.job
+    where jobname in (
+      'wasgeht-daily-event-import-cet',
+      'wasgeht-daily-event-import-cest'
+    )
+  loop
+    perform cron.unschedule(existing_job_id);
+  end loop;
+
+  perform cron.schedule(
+    'wasgeht-daily-event-import-cet',
+    '0 0 * * *',
+    'select public.trigger_daily_event_import();'
+  );
+  perform cron.schedule(
+    'wasgeht-daily-event-import-cest',
+    '0 1 * * *',
+    'select public.trigger_daily_event_import();'
   );
 end;
 $$;

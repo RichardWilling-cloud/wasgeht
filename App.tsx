@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Alert,
   FlatList,
   KeyboardAvoidingView,
@@ -65,6 +66,63 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function matchesDateGroup(value: string, group: "today" | "weekend" | "week") {
+  const eventDate = new Date(value);
+  if (Number.isNaN(eventDate.getTime())) return false;
+  const now = new Date();
+  const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const eventDay = startOfDay(eventDate);
+  const today = startOfDay(now);
+  const dayDifference = Math.round((eventDay.getTime() - today.getTime()) / 86_400_000);
+  if (group === "today") return dayDifference === 0;
+  if (group === "weekend") {
+    const daysUntilSaturday = (6 - today.getDay() + 7) % 7;
+    const weekendStart = new Date(today);
+    weekendStart.setDate(today.getDate() + daysUntilSaturday);
+    const weekendEnd = new Date(weekendStart);
+    weekendEnd.setDate(weekendStart.getDate() + 1);
+    return eventDay >= weekendStart && eventDay <= weekendEnd;
+  }
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - mondayOffset);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  return eventDay >= weekStart && eventDay <= weekEnd;
+}
+
+function AnimatedBackground() {
+  const motion = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(motion, { toValue: 1, duration: 9000, useNativeDriver: Platform.OS !== "web" }),
+        Animated.timing(motion, { toValue: 0, duration: 9000, useNativeDriver: Platform.OS !== "web" }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [motion]);
+
+  const firstBlobX = motion.interpolate({ inputRange: [0, 1], outputRange: [-70, 90] });
+  const firstBlobY = motion.interpolate({ inputRange: [0, 1], outputRange: [-45, 70] });
+  const secondBlobX = motion.interpolate({ inputRange: [0, 1], outputRange: [80, -75] });
+  const secondBlobY = motion.interpolate({ inputRange: [0, 1], outputRange: [65, -70] });
+  const thirdBlobX = motion.interpolate({ inputRange: [0, 1], outputRange: [-30, 55] });
+  const thirdBlobY = motion.interpolate({ inputRange: [0, 1], outputRange: [90, -35] });
+  const firstBlobRotation = motion.interpolate({ inputRange: [0, 1], outputRange: ["-12deg", "22deg"] });
+  const secondBlobRotation = motion.interpolate({ inputRange: [0, 1], outputRange: ["18deg", "-25deg"] });
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View style={[styles.backgroundBlob, styles.backgroundBlobPink, { transform: [{ translateX: firstBlobX }, { translateY: firstBlobY }, { rotate: firstBlobRotation }, { scale: 1.35 }] }]} />
+      <Animated.View style={[styles.backgroundBlob, styles.backgroundBlobGreen, { transform: [{ translateX: secondBlobX }, { translateY: secondBlobY }, { rotate: secondBlobRotation }, { scale: 1.5 }] }]} />
+      <Animated.View style={[styles.backgroundBlob, styles.backgroundBlobBlue, { transform: [{ translateX: thirdBlobX }, { translateY: thirdBlobY }, { scale: 1.7 }] }]} />
+    </View>
+  );
 }
 
 function Button({ label, onPress, secondary = false }: { label: string; onPress: () => void; secondary?: boolean }) {
@@ -173,7 +231,8 @@ export default function App() {
       ].join("-");
       const customEnd = dateEnd || dateStart;
       const hasCustomDateRange = /^\d{4}-\d{2}-\d{2}$/.test(dateStart);
-      const matchesQuickDate = dateGroup === "all" || dateGroup === "custom" || !hasCustomDateRange && event.date_group === dateGroup;
+      const matchesQuickDate = dateGroup === "all" || dateGroup === "custom"
+        || matchesDateGroup(event.starts_at, dateGroup);
       const matchesCustomDate = !hasCustomDateRange || eventDateKey >= dateStart && eventDateKey <= customEnd;
       const matchesQuery = !normalized || `${event.title} ${event.type} ${event.venue}`.toLocaleLowerCase("de").includes(normalized);
       return matchesGenre && matchesPlace && matchesQuickDate && matchesCustomDate && matchesQuery;
@@ -281,8 +340,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="light" />
+      <AnimatedBackground />
       <View style={styles.header}>
-        <Image source={require("./assets/icon.png")} style={styles.logo} resizeMode="contain" />
+        <Image source={require("./assets/logo.png")} style={styles.logo} tintColor={colors.ink} resizeMode="contain" />
         <View style={styles.headerActions}>
           {sessionEmail ? <Button label="Abmelden" onPress={() => void signOut()} secondary /> : <Button label="Anmelden" onPress={() => setAuthOpen(true)} secondary />}
           {profile?.role === "admin" && <Button label="Admin" onPress={() => { setAdminOpen(true); void loadAdminEvents(); }} />}
@@ -319,7 +379,7 @@ export default function App() {
         }
         renderItem={({ item }) => <EventCard event={item} onPress={() => setSelected(item)} />}
         ListEmptyComponent={<Text style={styles.empty}>Keine passenden Events gefunden.</Text>}
-        ListFooterComponent={visibleEvents.length < filteredEvents.length ? <View style={styles.loadMore}><Button label="Mehr anzeigen" secondary onPress={() => setVisibleEventLimit((limit) => limit + 12)} /></View> : null}
+        ListFooterComponent={visibleEvents.length < filteredEvents.length ? <View style={styles.loadMore}><Button label="Mehr anzeigen" secondary onPress={() => setVisibleEventLimit((limit) => limit + 12)} /></View> : undefined}
       />
       <View style={styles.organizerBar}>
         <View style={styles.organizerCopy}><Text style={styles.organizerTitle}>Dein Event. Deine Leute.</Text><Text style={styles.organizerText}>Reiche dein Event direkt in der App ein.</Text></View>
@@ -369,8 +429,12 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  logo: { width: 145, height: 54 },
+  header: { zIndex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  logo: { width: 145, height: 58 },
+  backgroundBlob: { position: "absolute", width: 320, height: 260, borderRadius: 160, opacity: 0.17, filter: [{ blur: 55 }] },
+  backgroundBlobPink: { top: 25, right: -125, backgroundColor: colors.pink },
+  backgroundBlobGreen: { top: 265, left: -145, backgroundColor: colors.accent },
+  backgroundBlobBlue: { top: 470, right: -130, backgroundColor: "#8294d8", opacity: 0.13 },
   headerActions: { flexDirection: "row", gap: 8 },
   content: { padding: 20, paddingBottom: 120 },
   eyebrow: { color: colors.muted, fontSize: 11, fontWeight: "700", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 },
@@ -389,7 +453,7 @@ const styles = StyleSheet.create({
   card: { flex: 1, minWidth: 0, backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 22, overflow: "hidden", marginBottom: 12 },
   cardPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
   poster: { height: 170, margin: 7, borderRadius: 17, justifyContent: "center", alignItems: "center", overflow: "hidden" },
-  posterImage: { ...StyleSheet.absoluteFillObject },
+  posterImage: StyleSheet.absoluteFill,
   posterText: { color: "#fff7fb", fontSize: 21, fontWeight: "900", textAlign: "center", padding: 12 },
   posterDate: { position: "absolute", bottom: 8, right: 8, color: colors.ink, backgroundColor: "rgba(45,43,48,.85)", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 5, fontSize: 10, fontWeight: "800" },
   cardContent: { padding: 10, paddingTop: 5 },
