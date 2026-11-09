@@ -2,6 +2,49 @@
 
 Statische Event-Website für Erfurt mit Supabase Auth, Eventdatenbank und Admin-Oberfläche.
 
+## Mobile-App für iOS und Android
+
+Im Repository liegt zusätzlich eine Expo-/React-Native-App. Sie verwendet dieselbe Supabase-Instanz wie die Website und enthält:
+
+- Eventübersicht mit Suche, Genre- und Umgebungsfilter
+- Eventkarten mit Detailansicht und Bildern
+- Login und Registrierung
+- Einreichung eigener Events
+- Admin-Übersicht mit Freigeben, Ausblenden und Löschen
+- EAS-Konfiguration für interne Builds und Store-Builds
+
+### Lokal starten
+
+Node.js und npm installieren, anschließend:
+
+```sh
+npm install
+npx expo start
+```
+
+Für einen echten Gerätestart:
+
+```sh
+npx expo run:ios
+npx expo run:android
+```
+
+Die Expo-Umgebungsvariablen stehen in [`.env.example`](./.env.example). Der öffentliche Supabase-Key darf in der App verwendet werden; niemals einen `service_role`-Key eintragen.
+
+### Store-Builds
+
+```sh
+npx eas login
+npx eas build:configure
+npx eas build --platform all --profile production
+npx eas submit --platform ios --profile production
+npx eas submit --platform android --profile production
+```
+
+Starter-App-Icon und Splashscreen liegen unter [`assets/`](./assets/) und sind in der Expo-Konfiguration aktiviert. Vor dem Store-Build sollten sie durch die finalen Brand-Assets ersetzt, Apple-/Google-Entwicklerkonten verbunden, Datenschutz-/Impressumsseiten hinterlegt und die Store-Metadaten ausgefüllt werden. Die Bundle-ID ist `de.wasgeht.app` für iOS und Android.
+
+Für die Einreichung eigener Events muss der aktualisierte Abschnitt aus [`supabase-schema.sql`](./supabase-schema.sql) einmal im Supabase SQL Editor ausgeführt werden. Er ergänzt `created_by` und erlaubt ausschließlich authentifizierten Nutzern, private Organizer-Events zur Prüfung einzureichen.
+
 ## Voraussetzungen
 
 - Ein Supabase-Projekt

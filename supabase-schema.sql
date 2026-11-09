@@ -163,6 +163,7 @@ revoke all on function public.move_event(uuid, integer) from public;
 grant execute on function public.move_event(uuid, integer) to authenticated;
 
 alter table public.events
+  add column if not exists created_by uuid references auth.users (id) on delete set null,
   add column if not exists category text not null default 'Party' check (category in ('Party', 'Rave', 'Konzert', 'Club', 'Festival', 'Workshop', 'Markt', 'LARP', 'Community', 'Kultur', 'Outdoor')),
   add column if not exists tags text[] not null default '{}',
   add column if not exists start_datetime timestamptz,
@@ -180,6 +181,20 @@ alter table public.events
   add column if not exists status text not null default 'published' check (status in ('published', 'needs_review')),
   add column if not exists updated_at timestamptz not null default now(),
   add column if not exists last_seen_at timestamptz not null default now();
+
+create index if not exists events_created_by_idx on public.events (created_by);
+
+drop policy if exists "Authenticated users submit private events" on public.events;
+create policy "Authenticated users submit private events"
+  on public.events
+  for insert
+  to authenticated
+  with check (
+    created_by = (select auth.uid())
+    and origin = 'organizer'
+    and is_public = false
+    and status = 'needs_review'
+  );
 
 create table if not exists public.events_archive (
   like public.events including defaults,

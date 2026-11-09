@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "wasgeht",
+    "slug": "wasgeht",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "wasgeht",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2d2b30"
+    },
+    "backgroundColor": "#2d2b30",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "de.wasgeht.app",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "de.wasgeht.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#2d2b30"
+      }
+    },
+    "plugins": [],
+    "extra": {}
+  }
+}
