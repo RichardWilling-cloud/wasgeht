@@ -169,9 +169,10 @@
       mask: url("wasgeht-ab-logo.svg") center / contain no-repeat;
       -webkit-mask: url("wasgeht-ab-logo.svg") center / contain no-repeat;
     }
-    .nav-links { gap: 34px; margin-left: 70px; margin-right: auto; font-size: 13px; font-weight: 700; }
+    .nav-links { flex-shrink: 1; gap: 34px; margin-left: 70px; margin-right: auto; font-size: 13px; font-weight: 700; }
+    .nav-links a { white-space: nowrap; }
     .nav-links a:hover, .footer-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
-    .nav-actions { gap: 20px; font-size: 12px; font-weight: 700; }
+    .nav-actions { flex-shrink: 0; gap: 20px; font-size: 12px; font-weight: 700; }
     .city-select { border: 0; background: transparent; padding: 8px 0; font-weight: 700; }
     .submit-link { border-bottom: 1px solid var(--ink); padding: 8px 0; }
     .theme-toggle,
@@ -186,6 +187,7 @@
       justify-content: center;
     }
     .menu-button { display: none; border: 0; background: transparent; font-size: 24px; }
+    .nav-actions > * { flex-shrink: 0; }
 
     .hero { display: grid; grid-template-columns: 1.05fr .95fr; min-height: 530px; padding: 54px 0 42px; border-bottom: 1px solid var(--line); }
     .hero-copy { position: relative; z-index: 1; padding: 0 4.5% 0 0; }
@@ -708,13 +710,19 @@
       .filter-actions { justify-content: flex-end; }
       .organizer-panel { grid-template-columns: 1fr; gap: 30px; }
     }
-    @media (max-width: 640px) {
-      .wrap { width: min(100% - 34px, 480px); }
-      .topline { font-size: 9px; }
-      .site-version { font-size: 8px; }
-      .nav { min-height: 65px; }
-      .nav-links, a.submit-link { display: none; }
-      .menu-button { display: block; }
+    @media (max-width: 820px) {
+      .nav-links,
+      .nav-actions > a.submit-link {
+        display: none;
+      }
+      .menu-button {
+        display: block;
+        flex: 0 0 40px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+      }
+      .nav-actions { gap: 8px; }
       .nav.menu-open { position: relative; }
       .nav.menu-open .nav-links {
         position: absolute;
@@ -739,6 +747,14 @@
       .nav.menu-open .nav-links a:hover {
         background: var(--control-active);
       }
+    }
+    @media (max-width: 640px) {
+      .wrap { width: min(100% - 34px, 480px); }
+      .topline { font-size: 9px; }
+      .site-version { font-size: 8px; }
+      .nav { min-height: 65px; }
+      .nav-links, a.submit-link { display: none; }
+      .menu-button { display: block; }
       .nav-actions { gap: 8px; }
       .city-select { display: none; }
       .account-button, .logout-button { height: 40px; padding: 8px 10px; font-size: 10px; }
