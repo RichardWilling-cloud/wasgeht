@@ -1654,6 +1654,88 @@ function eventPatch(event, hash) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Maintenance: runs once after the last batch of a (non dry-run) import and applies
+// the same clean-up rules to the whole stock of imported events. Only events with
+// origin "ai" are touched – manually created events and user submissions never are.
+const STALE_REVIEW_MS = 2 * 24 * 60 * 60 * 1000;
+
+function eventQualityScore(event) {
+  return (event.image_url ? 100 : 0) + Math.min(99, String(event.description || "").length / 10);
+}
+
+async function deleteEventsByIds(ids, accessToken) {
+  for (let index = 0; index < ids.length; index += 50) {
+    const chunk = ids.slice(index, index + 50);
+    await supabaseRequest(`events?id=in.(${chunk.map(encodeURIComponent).join(",")})&origin=eq.ai`, accessToken, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+  }
+}
+
+async function runMaintenance(accessToken) {
+  const report = { inactive_source: 0, excluded: 0, duplicates: 0, stale_review: 0, venues_renamed: 0, genre_fixed: 0 };
+  const { data: sources } = await supabaseRequest("sources?select=source_name,is_active", accessToken);
+  const activeSources = new Set((sources || []).filter((source) => source.is_active).map((source) => source.source_name));
+  const inactiveSources = new Set((sources || []).filter((source) => !source.is_active && !activeSources.has(source.source_name)).map((source) => source.source_name));
+  const { data: rows } = await supabaseRequest(
+    "events?select=id,title,description,venue,location_name,starts_at,start_datetime,image_url,source_name,status,genre,last_seen_at&origin=eq.ai&limit=5000",
+    accessToken,
+  );
+  const remaining = new Map((rows || []).map((row) => [row.id, row]));
+  const toDelete = new Set();
+  const drop = (row, reason) => {
+    if (toDelete.has(row.id)) return;
+    toDelete.add(row.id);
+    remaining.delete(row.id);
+    report[reason] += 1;
+  };
+
+  for (const row of [...remaining.values()]) {
+    if (row.source_name && inactiveSources.has(row.source_name)) drop(row, "inactive_source");
+    else if (exclusionReason({ exclude: null }, { title: row.title }, { title: row.title, description: row.description })) drop(row, "excluded");
+    else if (row.status === "needs_review" && Date.now() - new Date(row.last_seen_at || 0).getTime() > STALE_REVIEW_MS) drop(row, "stale_review");
+  }
+
+  // Duplicates: same canonical venue, start within 90 minutes, same core title words.
+  const candidates = [...remaining.values()]
+    .filter((row) => row.starts_at || row.start_datetime)
+    .sort((a, b) => String(a.starts_at || a.start_datetime).localeCompare(String(b.starts_at || b.start_datetime)));
+  for (let i = 0; i < candidates.length; i += 1) {
+    const left = candidates[i];
+    if (toDelete.has(left.id)) continue;
+    for (let j = i + 1; j < candidates.length; j += 1) {
+      const right = candidates[j];
+      const gap = new Date(right.starts_at || right.start_datetime).getTime() - new Date(left.starts_at || left.start_datetime).getTime();
+      if (gap > 90 * 60 * 1000) break;
+      if (toDelete.has(right.id)) continue;
+      if (!isDuplicate(left, { ...right, start_datetime: right.starts_at || right.start_datetime })) continue;
+      drop(eventQualityScore(left) >= eventQualityScore(right) ? right : left, "duplicates");
+      if (toDelete.has(left.id)) break;
+    }
+  }
+  await deleteEventsByIds([...toDelete], accessToken);
+
+  // Normalise what is left: canonical venue names and the "Szene & Nerd" genre rule.
+  for (const row of remaining.values()) {
+    const patch = {};
+    const venue = canonicalVenue(row.venue);
+    if (row.venue && venue !== row.venue) {
+      patch.venue = venue;
+      patch.location_name = venue;
+      report.venues_renamed += 1;
+    }
+    if (NERD_TITLE_PATTERN.test(row.title || "") && row.genre !== "szene") {
+      patch.genre = "szene";
+      report.genre_fixed += 1;
+    }
+    if (Object.keys(patch).length) await patchEvent(row.id, { ...patch, updated_at: new Date().toISOString() }, accessToken);
+  }
+  console.log("Import maintenance:", JSON.stringify(report));
+  return report;
+}
+
 async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken }) {
   const stats = { new: 0, updated: 0, unchanged: 0, archived: 0, needs_review: 0, excluded: 0 };
   const errors = [];
@@ -1819,6 +1901,17 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
       ...stats,
       errors,
     };
+    if (!dryRun && !result.has_more) {
+      try {
+        result.maintenance = await runMaintenance(accessToken);
+        const removed = Object.entries(result.maintenance)
+          .filter(([key, value]) => value && !["venues_renamed", "genre_fixed"].includes(key))
+          .map(([key, value]) => `${value} ${key}`);
+        if (removed.length) warnings.push(`Aufräumen: ${removed.join(", ")} gelöscht`);
+      } catch (error) {
+        errors.push({ source: "maintenance", message: error.message });
+      }
+    }
     if (runId) {
       await supabaseRequest(`import_runs?id=eq.${encodeURIComponent(runId)}`, accessToken, {
         method: "PATCH",

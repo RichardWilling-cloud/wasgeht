@@ -209,4 +209,16 @@ Lokale Variablen sind in `.env.example` dokumentiert. Diese Datei ist nur eine V
 
 Die Function speichert Events ohne belastbares Datum oder Ort nicht als veröffentlicht. Sie sucht fehlende Bilder zuerst in Open-Graph-/Twitter-Metadaten und Event-JSON-LD der offiziellen Eventseite. Wenn dort kein Bild verfügbar ist und `GOOGLE_SEARCH_API_KEY` konfiguriert wurde, nutzt sie SerpAPI/Google Images mit Eventtitel und Veranstaltungsort; verwendet werden nur Treffer, deren verlinkte Seite zur offiziellen Website der Quelle gehört. Die Bilddateien bleiben externe URLs und werden nicht in Supabase kopiert; ob die Website sie ohne Hotlink-Schutz ausliefert, liegt außerhalb der Plattform. Der Import nutzt den angemeldeten Admin-JWT mit RLS, schützt Organizer-Events, speichert den Namen der Importquelle samt Event-URL und zeigt beides in der Admin- und Prüfliste an. Die Function protokolliert Quellenfehler und archiviert vergangene Events transaktional. Die SQL-Erweiterung richtet zusätzlich einen täglichen Import um 02:00 Uhr Europe/Berlin mit `pg_cron` ein, der alle Batches verarbeitet und vergangene Events archiviert. Ein Dry-Run protokolliert den Lauf, verändert aber keine Events und archiviert nichts. Höchstens acht KI-Anfragen laufen je Batch, um Edge-Laufzeit und OpenAI-Rate-Limits einzuhalten; Website-Quellen werden parallel abgerufen. Die Oberfläche setzt manuelle weitere Batches automatisch nach 60 Sekunden fort, hält bei wiederholtem Rate-Limit aber an.
 
+### Automatisches Aufräumen
+
+Nach dem letzten Paket jedes vollständigen Imports (nicht im Testlauf) prüft `runMaintenance` den gesamten Bestand **automatisch importierter** Events (`origin = 'ai'`; manuell angelegte Events und Nutzer-Einreichungen bleiben unberührt):
+
+- Events deaktivierter Quellen werden gelöscht,
+- Fußball- und rechtsextreme Events (Inhaltsfilter) werden gelöscht,
+- Einträge der Prüfliste, die seit 2 Tagen in keiner Quelle mehr auftauchen, werden gelöscht,
+- Duplikate (gleiche Location, Beginn innerhalb von 90 Minuten, gleiche Kernwörter im Titel) werden zusammengeführt – behalten wird die Version mit Bild und längerer Beschreibung; nummerierte Vorstellungen („2. Show“) bleiben getrennt,
+- Location-Namen werden vereinheitlicht (`VENUE_ALIASES`), Gaming/Kartenspiele/LARP & Co. landen unter „Szene & Nerd“.
+
+Das Ergebnis steht in den Function-Logs („Import maintenance“) und als Hinweis im Ergebnis des letzten Import-Pakets.
+
 Die serverseitige Implementierung lebt in [`supabase/functions/run-event-import/index.ts`](./supabase/functions/run-event-import/index.ts) und bildet den echten Admin-Import-Lauf ab; dort sind die modularen Quellenadapter, der Admin-Check und die Archivierung bereits integriert.
