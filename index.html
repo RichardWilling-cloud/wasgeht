@@ -386,6 +386,11 @@
     .admin-toolbar > p { margin: 0; }
     .admin-toolbar .surprise { white-space: nowrap; }
     .admin-event-list { display: grid; gap: 9px; }
+    .admin-search { width: 100%; margin: 0 0 14px; }
+    .detail-dialog { width: min(620px, calc(100% - 32px)); }
+    .detail-poster { width: 100%; max-height: 330px; object-fit: cover; border-radius: 22px; margin: 8px 0 20px; }
+    .detail-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 0 0 18px; color: var(--muted); font-size: 12px; }
+    .detail-description { color: var(--body-copy); font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
     .admin-event-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 13px 15px; border: 1px solid rgba(255,255,255,.8); border-radius: 18px; background: var(--dialog-field-glass); }
     .admin-event-name { min-width: 0; }
     .admin-event-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
@@ -850,6 +855,7 @@
     <p class="eyebrow">ADMIN-BEREICH</p>
     <h2 id="adminTitle">Events verwalten</h2>
     <div class="admin-toolbar"><p>Events erstellen, bearbeiten, sortieren und sichtbar schalten.</p><button class="surprise" id="createEventButton" type="button">Event erstellen +</button></div>
+    <input class="dialog-field admin-search" id="adminEventSearch" type="search" placeholder="Events durchsuchen …" aria-label="Events im Admin-Bereich durchsuchen">
     <div class="admin-import-panel" style="margin-top: 18px; padding: 18px; border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; background: rgba(15, 18, 19, 0.32);">
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
         <strong>KI-Event-Import</strong>
@@ -890,6 +896,15 @@
       <p class="dialog-message" id="eventMessage" role="status" aria-live="polite"></p>
       <button class="surprise dialog-submit" type="submit">Speichern</button>
     </form>
+  </dialog>
+  <dialog class="app-dialog detail-dialog" id="detailDialog" aria-labelledby="detailTitle">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="Detailansicht schließen"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 3.5 9 9m0-9-9 9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg></button>
+    <p class="eyebrow">EVENT-DETAILS</p>
+    <h2 id="detailTitle"></h2>
+    <img class="detail-poster" id="detailPoster" alt="" hidden>
+    <div class="detail-meta" id="detailMeta"></div>
+    <p class="detail-description" id="detailDescription"></p>
+    <a class="submit-link" id="detailSourceLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Originalquelle öffnen ↗</a>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -1087,7 +1102,7 @@
       grid.innerHTML = filtered.map((event) => {
         const imageUrl = normalizeImageUrl(event.image_url, event.source_url || window.location.href);
         return `
-          <article class="event-card">
+          <article class="event-card" tabindex="0" role="button" data-event-id="${escapeHTML(event.id || "")}" aria-label="${escapeHTML(event.title)} öffnen">
             <div class="event-poster poster-${Math.max(1, Math.min(8, Number(event.poster) || 1))}${imageUrl ? " has-image" : ""}">
               ${imageUrl ? `<img class="event-poster-image" src="${escapeHTML(imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}
               <span class="poster-label">${escapeHTML(event.type)}</span>
@@ -1117,6 +1132,38 @@
       observeRevealElements(grid);
     }
 
+    function openEventDetails(event) {
+      if (!event) return;
+      if (signedInRole === "admin") {
+        openEventEditor(adminEventRecords.find((record) => record.id === event.id) || event);
+        return;
+      }
+      detailTitle.textContent = event.title;
+      const imageUrl = normalizeImageUrl(event.image_url, event.source_url || window.location.href);
+      detailPoster.hidden = !imageUrl;
+      if (imageUrl) {
+        detailPoster.src = imageUrl;
+        detailPoster.onerror = () => {
+          detailPoster.hidden = true;
+        };
+      }
+      detailMeta.innerHTML = [
+        event.date,
+        event.venue,
+        event.price,
+        event.type,
+      ].filter(Boolean).map((value) => `<span>${escapeHTML(value)}</span>`).join("");
+      detailDescription.textContent = event.description || "Keine weitere Beschreibung vorhanden.";
+      const sourceUrl = normalizeImageUrl(event.source_url);
+      detailSourceLink.hidden = !sourceUrl;
+      if (sourceUrl) detailSourceLink.href = sourceUrl;
+      detailDialog.showModal();
+    }
+
+    function findEventById(id) {
+      return events.find((event) => event.id === id);
+    }
+
     function showToast(message) {
       toast.textContent = message;
       toast.classList.add("show");
@@ -1129,7 +1176,15 @@
     const authMessage = document.getElementById("authMessage");
     const adminDialog = document.getElementById("adminDialog");
     const adminEventList = document.getElementById("adminEventList");
+    const adminEventSearch = document.getElementById("adminEventSearch");
     const eventDialog = document.getElementById("eventDialog");
+    const detailDialog = document.getElementById("detailDialog");
+    const detailTitle = document.getElementById("detailTitle");
+    const detailPoster = document.getElementById("detailPoster");
+    const detailMeta = document.getElementById("detailMeta");
+    const detailDescription = document.getElementById("detailDescription");
+    const detailSourceLink = document.getElementById("detailSourceLink");
+    let adminEventRecords = [];
     let isRegisterMode = false;
 
     function updateAuthMode() {
@@ -1213,6 +1268,7 @@
         title: record.title,
         type: record.type,
         genre: record.genre,
+        starts_at: record.starts_at,
         date: formatEventDate(record.starts_at),
         dateGroup: getDateGroup(record.starts_at),
         place: record.place,
@@ -1277,11 +1333,24 @@
     }
 
     function renderAdminEvents(records) {
-      if (!records.length) {
+      adminEventRecords = records;
+      const query = adminEventSearch.value.trim().toLocaleLowerCase("de");
+      const visibleRecords = records.filter((record) =>
+        !query || [
+          record.title,
+          record.type,
+          record.genre,
+          record.venue,
+          record.city,
+          record.source_name,
+          record.source_url,
+        ].filter(Boolean).join(" ").toLocaleLowerCase("de").includes(query)
+      );
+      if (!visibleRecords.length) {
         adminEventList.innerHTML = '<p class="dialog-message">Noch keine Events vorhanden. Lege das erste Event an.</p>';
         return;
       }
-      adminEventList.innerHTML = records.map((record, index) => `
+      adminEventList.innerHTML = visibleRecords.map((record, index) => `
         <article class="admin-event-row">
           <div class="admin-event-name">
             <strong>${escapeHTML(record.title)}</strong>
@@ -1710,6 +1779,19 @@
       if (signedInRole === "admin") adminDialog.showModal();
     });
     document.getElementById("createEventButton").addEventListener("click", () => openEventEditor());
+    adminEventSearch.addEventListener("input", () => renderAdminEvents(adminEventRecords));
+    grid.addEventListener("click", (event) => {
+      if (event.target.closest("a, button")) return;
+      const card = event.target.closest("[data-event-id]");
+      if (card) openEventDetails(findEventById(card.dataset.eventId));
+    });
+    grid.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const card = event.target.closest("[data-event-id]");
+      if (!card) return;
+      event.preventDefault();
+      openEventDetails(findEventById(card.dataset.eventId));
+    });
     runImportButton.addEventListener("click", () => void runImport());
     resetImportProgressButton.addEventListener("click", () => {
       if (runImportButton.disabled) {
