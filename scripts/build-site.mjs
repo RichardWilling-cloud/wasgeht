@@ -301,10 +301,10 @@ function renderPage({ title, description, canonical, image, eventId, jsonLd, bod
   <meta name="description" content="${escapeHtml(description)}">${robots ? `
   <meta name="robots" content="${robots}">` : ""}${canonical ? `
   <link rel="canonical" href="${canonical}">` : ""}
-  <link rel="icon" href="/favicon.ico" sizes="48x48">
-  <link rel="icon" href="/assets/favicon/favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="/assets/favicon/icon-192.png" type="image/png" sizes="192x192">
-  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
+  <link rel="icon" href="/favicon.ico?v=2" sizes="48x48">
+  <link rel="icon" href="/assets/favicon/favicon.svg?v=2" type="image/svg+xml">
+  <link rel="icon" href="/assets/favicon/icon-192.png?v=2" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png?v=2">
   <link rel="manifest" href="/site.webmanifest">
   <link rel="stylesheet" href="/assets/site.css?v=${versionTag}">
   <script src="/site.js?v=${versionTag}"></script>
