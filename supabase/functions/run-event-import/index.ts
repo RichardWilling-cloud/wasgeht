@@ -82,7 +82,7 @@ function streetFromAddress(address) {
 const VENUE_ALIASES = [
   [/^kalif\s*storch$/i, "Kalif Storch"],
   [/^(hsd\b.*|haus der sozialen dienste.*)$/i, "HsD – Haus der sozialen Dienste"],
-  [/^((klubhaus\s*)?kickerkeller|klubhaus)$/i, "Klubhaus Kickerkeller"],
+  [/^((klubhaus\s*)?kickerkeller|klubhaus|hot box comedy club)$/i, "Klubhaus Kickerkeller"],
   [/^triebwerk$/i, "Triebwerk"],
   [/^jederkann$/i, "jederkann"],
   [/^planet comics caf[eé]( erfurt)?$/i, "Planet Comics Café"],
@@ -322,7 +322,10 @@ function isDuplicate(existing, candidate) {
   const showNumber = (title) => String(title || "").match(/\b(\d+)\.\s*(show|vorstellung)\b/i)?.[1] || "1";
   const sameShow = showNumber(existing.title) === showNumber(candidate.title);
   const venueName = canonicalVenue(candidate.venue || candidate.location_name || "");
-  if (sameVenue && nearlySameStart && sameShow) {
+  // The same source sometimes files one event under two place names (e.g. a comedy
+  // series name vs. the club) – treat that like the same venue.
+  const sameSourceName = Boolean(existing.source_name && existing.source_name === candidate.source_name);
+  if ((sameVenue || sameSourceName) && nearlySameStart && sameShow) {
     // 1) Same core title words, e.g. "Gelungener Abend" / "Gelungener Abend – Stand-up Comedy".
     if (titleTokenOverlap(existing.title, candidate.title, venueName) >= 0.75) return true;
     // 2) Same start (±15 min) and a shared distinctive word: "Ikkimel die Geile!" / "Ikkimel Party • Kickerkeller".
