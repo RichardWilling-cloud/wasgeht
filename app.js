@@ -865,6 +865,16 @@ function openEventEditor(record = null) {
   document.getElementById("eventDescription").value = record?.description || "";
   document.getElementById("eventIsPublic").checked = record?.is_public ?? true;
   document.getElementById("eventMessage").textContent = "";
+  // Same admin actions as in the "Events verwalten" list (pin, source, delete).
+  const editorActions = document.getElementById("eventEditorActions");
+  editorActions.hidden = !record?.id;
+  if (record?.id) {
+    editorActions.querySelector('[data-editor-action="toggle-pin"]').textContent = (record.sort_order ?? 0) < 0 ? "Lösen" : "Anpinnen";
+    const sourceLink = document.getElementById("eventEditorSource");
+    const sourceUrl = normalizeImageUrl(record.source_url);
+    sourceLink.hidden = !sourceUrl;
+    if (sourceUrl) sourceLink.href = sourceUrl;
+  }
   eventDialog.showModal();
 }
 
@@ -958,7 +968,7 @@ async function handleAdminEventAction(action, eventId, button) {
     }
     await loadPublicEvents();
     await loadAdminEvents();
-    return;
+    return true;
   }
   if (action === "toggle-public") {
     const { error } = await supabaseClient.from("events").update({ is_public: !record.is_public }).eq("id", eventId);
@@ -968,7 +978,7 @@ async function handleAdminEventAction(action, eventId, button) {
     }
     await loadPublicEvents();
     await loadAdminEvents();
-    return;
+    return true;
   }
   if (action === "delete" && window.confirm(`„${record.title}“ wirklich löschen?`)) {
     button.disabled = true;
@@ -981,8 +991,27 @@ async function handleAdminEventAction(action, eventId, button) {
     await loadPublicEvents();
     await loadAdminEvents();
     showToast("Event wurde gelöscht.");
+    return true;
   }
+  return false;
 }
+
+document.getElementById("eventEditorActions").addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-editor-action]");
+  const eventId = document.getElementById("eventId").value;
+  if (!button || !eventId) return;
+  const action = button.dataset.editorAction;
+  const done = await handleAdminEventAction(action, eventId, button);
+  if (!done) return;
+  if (action === "delete") {
+    eventDialog.close();
+    return;
+  }
+  const updated = adminEventRecords.find((record) => record.id === eventId);
+  const pinned = (updated?.sort_order ?? 0) < 0;
+  button.textContent = pinned ? "Lösen" : "Anpinnen";
+  showToast(pinned ? "Event ist oben angepinnt." : "Event ist nicht mehr angepinnt.");
+});
 
 async function runImport(isAutomaticContinuation = false) {
   if (!supabaseClient || signedInRole !== "admin") {

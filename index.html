@@ -9,10 +9,10 @@
   <meta name="theme-color" content="#2d2b30">
   <script>try{var d=document.documentElement,u=navigator.userAgent||"",p=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||"";if(/Windows/i.test(u+" "+p)||/Firefox/i.test(u))d.classList.add("performance-lite");if(localStorage.getItem("wasgeht-theme")==="light")d.dataset.theme="light"}catch(e){}</script>
   <script src="site.js"></script>
-  <link rel="icon" href="/favicon.ico?v=3" sizes="48x48">
-  <link rel="icon" href="/assets/favicon/favicon.svg?v=3" type="image/svg+xml">
-  <link rel="icon" href="/assets/favicon/icon-192.png?v=3" type="image/png" sizes="192x192">
-  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png?v=3">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/favicon/icon-48.png" type="image/png" sizes="48x48">
+  <link rel="icon" href="/assets/favicon/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
   <link rel="manifest" href="/site.webmanifest">
   <link rel="preconnect" href="https://zvhvofgpizwhtxmcnghm.supabase.co" crossorigin>
   <meta name="description" content="Events in Erfurt entdecken: Raves, Konzerte, Partys, Szene-Treffen und alternative Veranstaltungen – heute, am Wochenende oder wann du willst.">
@@ -543,6 +543,8 @@
     .admin-event-actions button { min-height: 34px; padding: 7px 10px; border: 1px solid rgba(145,119,145,.22); border-radius: 999px; background: var(--dialog-glass); color: var(--ink); font-size: 10px; font-weight: 700; cursor: pointer; }
     .admin-event-actions button:hover { border-color: var(--blue); }
     .admin-event-actions .delete-event { color: #a63d63; }
+    .event-editor-actions { flex-wrap: wrap; margin: 16px 0 4px; }
+    .event-editor-actions .admin-source-link { margin: 0 auto 0 6px; font-size: 11px; font-weight: 700; }
     .dialog-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .dialog-checkbox { display: flex; align-items: center; gap: 9px; margin: 17px 0 5px; color: var(--ink); font-size: 12px; font-weight: 700; }
     .dialog-checkbox input { width: 17px; height: 17px; accent-color: var(--orange); }
@@ -1165,6 +1167,11 @@
       <label class="dialog-field">Kurzbeschreibung<textarea id="eventDescription" maxlength="500" rows="3"></textarea></label>
       <label class="dialog-checkbox"><input id="eventIsPublic" type="checkbox" checked> Öffentlich sichtbar</label>
       <p class="dialog-message" id="eventMessage" role="status" aria-live="polite"></p>
+      <div class="admin-event-actions event-editor-actions" id="eventEditorActions" hidden>
+        <button type="button" data-editor-action="toggle-pin">Anpinnen</button>
+        <a class="admin-source-link" id="eventEditorSource" href="#" target="_blank" rel="noopener noreferrer" hidden>Originalquelle ↗</a>
+        <button class="delete-event" type="button" data-editor-action="delete">Event löschen</button>
+      </div>
       <button class="surprise dialog-submit" type="submit">Speichern</button>
     </form>
   </dialog>

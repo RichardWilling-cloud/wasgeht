@@ -96,12 +96,30 @@ function canonicalVenue(name) {
 
 const TITLE_STOPWORDS = new Set(["und", "der", "die", "das", "mit", "von", "the", "and", "feat", "live", "erfurt", "vol", "tour", "party", "konzert"]);
 
+// Significant title words; the venue's own name ("… Kickerkeller") is not a difference.
+function titleTokens(value, venue = "") {
+  const venueWords = new Set(normalizeText(venue).split(" "));
+  return new Set(normalizeText(value).split(" ")
+    .filter((word) => word.length >= 3 && !TITLE_STOPWORDS.has(word) && !venueWords.has(word)));
+}
+
 // Share of the shorter title's significant words that also appear in the longer one.
-function titleTokenOverlap(left, right) {
-  const tokens = (value) => new Set(normalizeText(value).split(" ").filter((word) => word.length >= 3 && !TITLE_STOPWORDS.has(word)));
-  const a = tokens(left);
-  const b = tokens(right);
+function titleTokenOverlap(left, right, venue = "") {
+  const a = titleTokens(left, venue);
+  const b = titleTokens(right, venue);
   if (!a.size || !b.size) return 0;
+  const [shorter, longer] = a.size <= b.size ? [a, b] : [b, a];
+  let hits = 0;
+  for (const word of shorter) if (longer.has(word)) hits += 1;
+  return hits / shorter.size;
+}
+
+// Share of the shorter description's content words found in the other one (needs some text).
+function descriptionOverlap(left, right) {
+  const words = (value) => new Set(normalizeText(value).split(" ").filter((word) => word.length >= 4 && !TITLE_STOPWORDS.has(word)));
+  const a = words(left);
+  const b = words(right);
+  if (Math.min(a.size, b.size) < 6) return 0;
   const [shorter, longer] = a.size <= b.size ? [a, b] : [b, a];
   let hits = 0;
   for (const word of shorter) if (longer.has(word)) hits += 1;
@@ -303,7 +321,18 @@ function isDuplicate(existing, candidate) {
   // "2. Show" on the same evening is a separate performance, not a duplicate.
   const showNumber = (title) => String(title || "").match(/\b(\d+)\.\s*(show|vorstellung)\b/i)?.[1] || "1";
   const sameShow = showNumber(existing.title) === showNumber(candidate.title);
-  if (sameVenue && nearlySameStart && sameShow && titleTokenOverlap(existing.title, candidate.title) >= 0.75) return true;
+  const venueName = canonicalVenue(candidate.venue || candidate.location_name || "");
+  if (sameVenue && nearlySameStart && sameShow) {
+    // 1) Same core title words, e.g. "Gelungener Abend" / "Gelungener Abend – Stand-up Comedy".
+    if (titleTokenOverlap(existing.title, candidate.title, venueName) >= 0.75) return true;
+    // 2) Same start (±15 min) and a shared distinctive word: "Ikkimel die Geile!" / "Ikkimel Party • Kickerkeller".
+    const sameMoment = Math.abs(existingStart - candidateStart) <= 15 * 60 * 1000;
+    const existingWords = titleTokens(existing.title, venueName);
+    const sharesDistinctiveWord = [...titleTokens(candidate.title, venueName)].some((word) => word.length >= 5 && existingWords.has(word));
+    if (sameMoment && sharesDistinctiveWord) return true;
+    // 3) Same content: the descriptions say the same thing, whatever the titles are.
+    if (descriptionOverlap(existing.description, candidate.description) >= 0.6) return true;
+  }
   return Boolean(sameSource && titleScore >= 0.6)
     || Boolean(sameDate && titleScore >= 0.9 && placeMatchesOrIsUnknown)
     || Boolean(rangesOverlap && titleScore >= 0.9 && placeMatchesOrIsUnknown);
@@ -1790,7 +1819,7 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
       }
     }));
     const { data: existing } = await supabaseRequest(
-      `events?select=id,title,type,genre,starts_at,start_datetime,venue,location_name,source_url,source_name,image_url,origin,content_hash&limit=1000`,
+      `events?select=id,title,description,type,genre,starts_at,start_datetime,venue,location_name,source_url,source_name,image_url,origin,content_hash&limit=1000`,
       accessToken,
     );
     const existingEvents = existing || [];
