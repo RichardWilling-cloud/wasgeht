@@ -1765,8 +1765,22 @@ async function runMaintenance(accessToken) {
   return report;
 }
 
+// Events an admin deleted must not come back. A remembered event blocks a candidate
+// on the same day (Europe/Berlin) that the duplicate rules consider the same event.
+const berlinDay = (value) => (value ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date(value)) : "");
+
+function isDeletedByAdmin(event, deletedEvents) {
+  return deletedEvents.some((deleted) => {
+    const tombstone = { ...deleted, start_datetime: deleted.starts_at, location_name: deleted.venue };
+    if (!deleted.starts_at) {
+      return Boolean(deleted.source_url && deleted.source_url === event.source_url && similarity(deleted.title, event.title) >= 0.9);
+    }
+    return berlinDay(deleted.starts_at) === berlinDay(event.start_datetime || event.starts_at) && isDuplicate(tombstone, event);
+  });
+}
+
 async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken }) {
-  const stats = { new: 0, updated: 0, unchanged: 0, archived: 0, needs_review: 0, excluded: 0 };
+  const stats = { new: 0, updated: 0, unchanged: 0, archived: 0, needs_review: 0, excluded: 0, blocked: 0 };
   const errors = [];
   const warnings = [];
   const startedAt = new Date().toISOString();
@@ -1823,6 +1837,14 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
       accessToken,
     );
     const existingEvents = existing || [];
+    const { data: deletedRows } = await supabaseRequest(
+      `deleted_events?select=title,description,venue,starts_at,source_url&or=(starts_at.is.null,starts_at.gte.${encodeURIComponent(new Date(Date.now() - 2 * 86400000).toISOString())})&limit=2000`,
+      accessToken,
+    ).catch((error) => {
+      warnings.push(`Merkliste gelöschter Events nicht lesbar: ${error.message}`);
+      return { data: [] };
+    });
+    const deletedEvents = deletedRows || [];
     const now = new Date().toISOString();
     let processedCandidates = 0;
     let batchInterrupted = false;
@@ -1839,6 +1861,16 @@ async function processImport({ city, dryRun, maxEvents, batchOffset, accessToken
 
         const hash = await sha256(contentForHash(event));
         const match = existingEvents.find((item) => isDuplicate(item, event));
+        if (isDeletedByAdmin(event, deletedEvents)) {
+          // Deleted by an admin: never re-import; remove a copy that slipped back in.
+          if (match && match.origin === "ai" && !dryRun) {
+            await deleteEvent(match.id, accessToken);
+            existingEvents.splice(existingEvents.indexOf(match), 1);
+          }
+          stats.blocked += 1;
+          processedCandidates += 1;
+          continue;
+        }
         const exclusion = exclusionReason(extracted, candidate, event);
         if (exclusion) {
           // Excluded content is never imported; an earlier imported copy is removed.

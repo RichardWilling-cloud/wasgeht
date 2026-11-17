@@ -219,6 +219,8 @@ Nach dem letzten Paket jedes vollständigen Imports (nicht im Testlauf) prüft `
 - Duplikate (gleiche Location, Beginn innerhalb von 90 Minuten, gleiche Kernwörter im Titel) werden zusammengeführt – behalten wird die Version mit Bild und längerer Beschreibung; nummerierte Vorstellungen („2. Show“) bleiben getrennt,
 - Location-Namen werden vereinheitlicht (`VENUE_ALIASES`), Gaming/Kartenspiele/LARP & Co. landen unter „Szene & Nerd“.
 
+Gelöschte Events bleiben gelöscht: Löscht oder verwirft ein Admin ein automatisch importiertes Event, landet es in `public.deleted_events` ([`supabase/2026-11-deleted-events.sql`](./supabase/2026-11-deleted-events.sql)). Der Import überspringt am selben Tag jedes Event, das die Duplikatregeln als dasselbe erkennen; andere Termine einer Reihe bleiben unberührt. Einträge werden 30 Tage nach dem Eventdatum entfernt.
+
 Das Ergebnis steht in den Function-Logs („Import maintenance“) und als Hinweis im Ergebnis des letzten Import-Pakets.
 
 Die serverseitige Implementierung lebt in [`supabase/functions/run-event-import/index.ts`](./supabase/functions/run-event-import/index.ts) und bildet den echten Admin-Import-Lauf ab; dort sind die modularen Quellenadapter, der Admin-Check und die Archivierung bereits integriert.

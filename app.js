@@ -829,6 +829,7 @@ async function handleReviewAction(action, eventId) {
   }
 
   if (action === "reject") {
+    await rememberDeletedEvent(data);
     const { error: rejectError } = await supabaseClient.from("events").delete().eq("id", eventId);
     if (rejectError) {
       showToast(`Event konnte nicht verworfen werden: ${rejectError.message}`);
@@ -937,6 +938,21 @@ async function saveEvent(event) {
   showToast(eventId ? "Event wurde gespeichert." : "Event wurde erstellt.");
 }
 
+// Imported events that an admin deletes are remembered, so the nightly import
+// does not add them again (see public.deleted_events).
+async function rememberDeletedEvent(record) {
+  if (!record || record.origin !== "ai") return;
+  const { error } = await supabaseClient.from("deleted_events").insert({
+    title: String(record.title || "").slice(0, 200),
+    description: record.description ? String(record.description).slice(0, 1000) : null,
+    venue: record.venue || null,
+    starts_at: record.starts_at || record.start_datetime || null,
+    source_url: record.source_url || null,
+    source_name: record.source_name || null,
+  });
+  if (error) console.warn("Deleted event could not be remembered:", error);
+}
+
 async function handleAdminEventAction(action, eventId, button) {
   if (!supabaseClient || signedInRole !== "admin") return;
   const { data: records, error: loadError } = await supabaseClient
@@ -982,6 +998,7 @@ async function handleAdminEventAction(action, eventId, button) {
   }
   if (action === "delete" && window.confirm(`„${record.title}“ wirklich löschen?`)) {
     button.disabled = true;
+    await rememberDeletedEvent(record);
     const { error } = await supabaseClient.from("events").delete().eq("id", eventId);
     if (error) {
       button.disabled = false;
